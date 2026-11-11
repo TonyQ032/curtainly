@@ -2,6 +2,11 @@
  * Curtainly database schema (Drizzle). Source of truth for web/ and ingest/.
  * Model: Work → Production → Performance, with Company and Venue alongside,
  * and Source + ReviewItem powering ingestion. See docs/PLAN.md → "Data model".
+ *
+ * Every table enables row-level security with no policies, so Supabase's public
+ * Data API (anon/authenticated keys) can't read or write anything. The app and
+ * ingest connect as the postgres role, which bypasses RLS. New tables must call
+ * .enableRLS() too.
  */
 import { sql } from 'drizzle-orm';
 import {
@@ -64,7 +69,7 @@ export const regions = pgTable('regions', {
   radiusMiles: integer('radius_miles').notNull(),
   status: regionStatusEnum('status').notNull().default('planned'),
   ...timestamps,
-});
+}).enableRLS();
 
 export const companies = pgTable(
   'companies',
@@ -84,7 +89,7 @@ export const companies = pgTable(
     ...timestamps,
   },
   (t) => [index('companies_region_idx').on(t.regionId)],
-);
+).enableRLS();
 
 export const venues = pgTable(
   'venues',
@@ -101,7 +106,7 @@ export const venues = pgTable(
     ...timestamps,
   },
   (t) => [index('venues_location_gix').using('gist', t.location)],
-);
+).enableRLS();
 
 export type WorkAuthors = {
   playwright?: string[];
@@ -127,7 +132,7 @@ export const works = pgTable(
     ...timestamps,
   },
   (t) => [index('works_normalized_title_idx').on(t.normalizedTitle)],
-);
+).enableRLS();
 
 export const productions = pgTable(
   'productions',
@@ -162,7 +167,7 @@ export const productions = pgTable(
     index('productions_company_work_idx').on(t.companyId, t.workId),
     index('productions_status_end_idx').on(t.status, t.endDate),
   ],
-);
+).enableRLS();
 
 export const performances = pgTable(
   'performances',
@@ -181,7 +186,7 @@ export const performances = pgTable(
     uniqueIndex('performances_production_starts_uq').on(t.productionId, t.startsAt),
     index('performances_starts_at_idx').on(t.startsAt),
   ],
-);
+).enableRLS();
 
 export const sources = pgTable('sources', {
   id: id(),
@@ -199,7 +204,7 @@ export const sources = pgTable('sources', {
   lastError: text('last_error'),
   health: sourceHealthEnum('health').notNull().default('unknown'),
   ...timestamps,
-});
+}).enableRLS();
 
 export const reviewItems = pgTable(
   'review_items',
@@ -221,7 +226,7 @@ export const reviewItems = pgTable(
     ...timestamps,
   },
   (t) => [index('review_items_status_idx').on(t.status, t.createdAt)],
-);
+).enableRLS();
 
 export const leads = pgTable('leads', {
   id: id(),
@@ -231,7 +236,7 @@ export const leads = pgTable('leads', {
   origin: leadOriginEnum('origin').notNull(),
   status: leadStatusEnum('status').notNull().default('new'),
   ...timestamps,
-});
+}).enableRLS();
 
 export const reports = pgTable('reports', {
   id: id(),
@@ -242,4 +247,4 @@ export const reports = pgTable('reports', {
   contact: text('contact'),
   status: reportStatusEnum('status').notNull().default('open'),
   ...timestamps,
-});
+}).enableRLS();

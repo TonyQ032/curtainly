@@ -18,6 +18,8 @@ pnpm workspace: `web/` (Next.js App Router), `ingest/` (adapters + runner, `tsx`
 
 - Run `pnpm typecheck && pnpm lint && pnpm test` before committing; CI also runs `pnpm format:check` and `pnpm build`.
 - Schema changes: edit `schema.ts`, then `pnpm db:generate`. drizzle-kit drops the SRID on geometry columns; fix the generated SQL to `geometry(point, 4326)`.
+- Every table calls `.enableRLS()` with no policies so Supabase's public Data API can't touch data; app code connects as `postgres` and bypasses RLS.
+- `pnpm db:migrate` reads `DATABASE_URL` from the root `.env` (Supabase session pooler URL, port 5432).
 - PostGIS points use `mode: 'xy'`: x = longitude, y = latitude.
 - Performance times are `timestamptz`; group and archive by the Region's `timezone`.
 - Adapter contract lives in `ingest/src/types.ts`: `fetch(source) → RawItem[]`, `normalize(raw) → CandidateProduction[]`. Each adapter gets fixture-based tests.
