@@ -2,6 +2,16 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-11: Theater color theme (#79)
+
+**Plain CSS with tokens in one file.** All colors live in `web/src/app/theme.css`: a raw palette (curtain reds, brass, velvet darks, playbill paper) and semantic tokens built from it. This settles the color part of #42; typography and spacing stay open there.
+
+**One definition per token, both themes side by side**, using CSS `light-dark(<light>, <dark>)`. Next compiles it (Lightning CSS) into a fallback driven by helper variables that it adds wherever `color-scheme` is set _in CSS_. So themes are switched only through CSS rules (`data-theme` on `<html>`, or the `.scheme-light` / `.scheme-dark` classes), never an inline `color-scheme` style.
+
+**System theme by default, Light / Dark / System toggle.** The choice is stored in `localStorage` (`curtainly-theme`) and applied by a tiny inline script in `<head>` before first paint, so there's no flash of the wrong theme. No cookie, so pages stay cacheable.
+
+**Contrast:** text tokens are at least 4.5:1 and UI outlines and the focus ring at least 3:1 against their backgrounds in both themes (WCAG AA). Error red sits close to the accent red; errors always carry text, not color alone.
+
 ## 2026-11-11: Admin login (#7)
 
 **Email + password via Supabase Auth, single admin, sign-ups disabled.** The admin user is created in the Supabase dashboard; public sign-ups are turned off in Supabase. Password login needs no redirect-URL or email setup (magic links would need both, and Supabase's built-in email is heavily rate-limited). Could switch to magic link or GitHub OAuth later without schema changes.

@@ -17,6 +17,7 @@ export const NAV: NavGroup[] = [
     ],
   },
   { items: [{ href: '/admin/coverage', label: 'Coverage', issue: 60 }] },
+  { label: 'Settings', items: [{ href: '/admin/theme', label: 'Theme' }] },
 ];
 
 /** Placeholder sections, keyed by their path segment under /admin. */

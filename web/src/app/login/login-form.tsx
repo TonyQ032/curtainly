@@ -22,7 +22,7 @@ export function LoginForm({ next }: { next?: string }) {
           {state.error}
         </p>
       )}
-      <button type="submit" disabled={pending}>
+      <button type="submit" className="primary" disabled={pending}>
         {pending ? 'Signing in…' : 'Sign in'}
       </button>
     </form>
