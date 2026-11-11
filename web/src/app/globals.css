@@ -2,6 +2,7 @@
   --bg: #ffffff;
   --fg: #1a1a1a;
   --muted: #6b6b6b;
+  --error: #c62828;
   color-scheme: light dark;
 }
 
@@ -10,6 +11,7 @@
     --bg: #121212;
     --fg: #ededed;
     --muted: #a0a0a0;
+    --error: #ff8a80;
   }
 }
 
@@ -37,4 +39,60 @@ body {
 
 .muted {
   color: var(--muted);
+}
+
+.narrow {
+  max-width: 400px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+input,
+button {
+  font: inherit;
+  padding: 8px 12px;
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: var(--error);
+  margin: 0;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--muted);
+}
+
+.admin-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
