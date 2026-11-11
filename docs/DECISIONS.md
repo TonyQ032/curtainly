@@ -2,6 +2,14 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-11: Supabase setup
+
+**Row-level security on every table, no policies.** Supabase exposes the `public` schema through its Data API using the anon key, which is shipped to browsers. RLS with no policies blocks that API entirely. The web app and ingest connect with `DATABASE_URL` as the `postgres` role, which bypasses RLS, so all data access goes through our own server code. If the browser ever needs to query Supabase directly, add explicit policies for that case.
+
+**Connection strings.** Migrations and GitHub Actions use the Supabase _session pooler_ (port 5432); the direct connection is IPv6-only and GitHub runners can't reach it. The Vercel app will use the _transaction pooler_ (port 6543); the client sets `prepare: false` for it.
+
+**PostGIS is enabled from the Supabase dashboard** (in the `extensions` schema). Migration 0000 is a no-op there and only matters for other databases.
+
 ## 2026-11-11: Initial setup
 
 **Hosting stays on Vercel Hobby (free) for now.** Vercel Hobby is for non-commercial use only, and affiliate links count as commercial. Plan: upgrade to Vercel Pro (about $20/month, inside the $0–25 budget) before the first affiliate link ships (Phase 2, Ticketmaster via Impact). A donation link alone is fine on Hobby. Tracked as an issue in Phase 2.
