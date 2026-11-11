@@ -1,0 +1,4 @@
+pnpm-lock.yaml
+shared/drizzle/
+.next/
+docs/PLAN.md
