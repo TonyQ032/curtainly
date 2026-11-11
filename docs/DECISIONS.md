@@ -2,6 +2,18 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-11: Admin login (#7)
+
+**Email + password via Supabase Auth, single admin, sign-ups disabled.** The admin user is created in the Supabase dashboard; public sign-ups are turned off in Supabase. Password login needs no redirect-URL or email setup (magic links would need both, and Supabase's built-in email is heavily rate-limited). Could switch to magic link or GitHub OAuth later without schema changes.
+
+**Two layers of checks.** `web/src/proxy.ts` (Next 16's renamed middleware) refreshes the session and redirects non-admins away from `/admin/*` using verified JWT claims. It is only a pre-filter: `requireAdmin()` in `web/src/lib/auth.ts` verifies the user with Supabase Auth and checks the `ADMIN_EMAILS` allowlist, and every admin page, Server Action and Route Handler must call it.
+
+**Allowlist fails closed.** An empty or unset `ADMIN_EMAILS` means nobody gets in, even with a valid Supabase account.
+
+**Publishable key naming.** Env var is `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Supabase's current key type); the legacy anon key works in the same variable.
+
+**One env file.** `next.config.ts` loads the repo-root `.env` in local dev, so `web/.env.local` isn't needed.
+
 ## 2026-11-11: Supabase setup
 
 **Row-level security on every table, no policies.** Supabase exposes the `public` schema through its Data API using the anon key, which is shipped to browsers. RLS with no policies blocks that API entirely. The web app and ingest connect with `DATABASE_URL` as the `postgres` role, which bypasses RLS, so all data access goes through our own server code. If the browser ever needs to query Supabase directly, add explicit policies for that case.
