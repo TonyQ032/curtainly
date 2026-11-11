@@ -28,3 +28,4 @@ pnpm workspace: `web/` (Next.js App Router), `ingest/` (adapters + runner, `tsx`
 
 - Work is tracked as GitHub issues under milestones M0–M5 (MVP), then Phase 2 and Phase 3. Labels: `area:*` for package, `type:*`, `decision` for open choices.
 - Branch per issue (`<issue#>-short-name`), PR into `main`, reference the issue with `Closes #N`.
+- Kanban board: the [Curtainly project](https://github.com/users/TonyQ032/projects/4) (views: Board, By milestone, Decisions). Status flow: Backlog → Ready (current milestone) → In progress (branch cut) → In review (PR open) → Done (merged or closed). When starting or opening a PR for an issue, move its card with `gh project item-edit`.
