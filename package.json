@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @curtainly/shared db:generate",
     "db:migrate": "pnpm --filter @curtainly/shared db:migrate",
-    "ingest": "pnpm --filter @curtainly/ingest start"
+    "ingest": "pnpm --filter @curtainly/ingest start",
+    "db:seed": "pnpm --filter @curtainly/shared db:seed"
   },
   "devDependencies": {
     "prettier": "^3.10.0",
