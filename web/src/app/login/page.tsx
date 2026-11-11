@@ -13,9 +13,12 @@ export default async function LoginPage({
 }) {
   const { next } = await searchParams;
   return (
-    <main className="container narrow">
-      <h1>Admin sign in</h1>
-      <LoginForm next={next} />
-    </main>
+    <>
+      <div className="curtain-band" />
+      <main className="container narrow">
+        <h1>Admin sign in</h1>
+        <LoginForm next={next} />
+      </main>
+    </>
   );
 }

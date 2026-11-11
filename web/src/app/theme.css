@@ -1,0 +1,124 @@
+/*
+ * Curtainly theme: every color on the site comes from this file.
+ *
+ * 1. Palette: the raw colors. Tweak these to shift the whole look.
+ * 2. Tokens: what each color is *for*. Every token is written once as
+ *    light-dark(<light value>, <dark value>), so both themes sit side by side.
+ *
+ * Components use tokens only (var(--bg), var(--accent)…), never palette colors
+ * or hex values. Preview everything at /admin/theme. If you add a token, add it
+ * to the TOKENS list in web/src/app/admin/theme/tokens.ts so the preview shows it.
+ * Keep text tokens at 4.5:1 contrast or better against the backgrounds they sit on.
+ */
+
+:root {
+  /* ---------- 1. Palette ---------- */
+
+  /* Curtain: deep stage-curtain reds */
+  --curtain-950: #2a0709;
+  --curtain-900: #3a1115;
+  --curtain-800: #7e161b;
+  --curtain-700: #8b1a1f;
+  --curtain-600: #a61e25;
+  --curtain-500: #b8262e;
+  --curtain-400: #cc3038;
+  --curtain-200: #f0a3a7;
+  --curtain-100: #f8e3e1;
+
+  /* Brass: proscenium trim and marquee bulbs */
+  --brass-700: #7a5b12;
+  --brass-500: #c9a227;
+  --brass-300: #e6cb78;
+
+  /* Velvet: the dark house */
+  --velvet-950: #120b0c;
+  --velvet-900: #1b1213;
+  --velvet-800: #261a1b;
+  --velvet-700: #3a2a2b;
+  --velvet-500: #7d6a62;
+  --velvet-300: #b3a398;
+
+  /* Playbill: warm paper and ink */
+  --playbill-50: #fbf7f0;
+  --playbill-100: #f3ece0;
+  --playbill-200: #e2d5c3;
+  --playbill-400: #8f7d70;
+  --playbill-600: #6b5a52;
+  --playbill-ink: #1e1415;
+  --playbill-cream: #f3ebdd;
+
+  /* Status colors */
+  --red-700: #b42318;
+  --red-300: #ff8a80;
+  --green-700: #2e6b3a;
+  --green-300: #7bc489;
+}
+
+/*
+ * Tokens are also declared on .theme-scope so part of a page can show a fixed
+ * theme: class="theme-scope scheme-light" or "theme-scope scheme-dark" (the
+ * /admin/theme preview does this). Set the scheme with these classes, not an
+ * inline color-scheme style: Next compiles light-dark() into a fallback that
+ * only works where color-scheme is set in CSS.
+ */
+:root,
+.theme-scope {
+  /* ---------- 2. Tokens: light-dark(light, dark) ---------- */
+
+  /* Surfaces */
+  --bg: light-dark(var(--playbill-50), var(--velvet-950)); /* page background */
+  --surface: light-dark(var(--playbill-100), var(--velvet-900)); /* table headers, hover */
+  --surface-raised: light-dark(#ffffff, var(--velvet-800)); /* inputs, cards */
+  --line: light-dark(var(--playbill-200), var(--velvet-700)); /* dividers, table rules */
+  /* input and button outlines */
+  --control-border: light-dark(var(--playbill-400), var(--velvet-500));
+
+  /* Text */
+  --fg: light-dark(var(--playbill-ink), var(--playbill-cream)); /* body text */
+  --muted: light-dark(var(--playbill-600), var(--velvet-300)); /* secondary text */
+  --link: light-dark(var(--curtain-700), var(--brass-300));
+
+  /* Accent: the red curtain */
+  --accent: light-dark(var(--curtain-600), var(--curtain-500)); /* primary buttons, active marks */
+  --accent-hover: light-dark(var(--curtain-700), var(--curtain-400));
+  --accent-fg: light-dark(#ffffff, #fff5f2); /* text on --accent */
+  --accent-soft: light-dark(var(--curtain-100), var(--curtain-900)); /* selected nav item, tags */
+  --accent-soft-fg: light-dark(var(--curtain-800), var(--curtain-200)); /* text on --accent-soft */
+
+  /* Highlight: brass, for "live" and other spotlight moments */
+  --highlight: light-dark(var(--brass-700), var(--brass-300));
+  --focus: light-dark(var(--brass-700), var(--brass-300)); /* keyboard focus ring */
+
+  /* Status */
+  --error: light-dark(var(--red-700), var(--red-300));
+  --success: light-dark(var(--green-700), var(--green-300));
+
+  /* Decorative curtain folds (header band). Uses palette colors on purpose: it's red in both themes. */
+  --curtain-folds: repeating-linear-gradient(
+    90deg,
+    var(--curtain-800) 0 14px,
+    var(--curtain-600) 14px 22px,
+    var(--curtain-700) 22px 32px
+  );
+}
+
+/* Theme selection: follow the system unless the toggle set data-theme on <html>. */
+:root {
+  color-scheme: light dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+.scheme-light {
+  color-scheme: light;
+}
+
+.scheme-dark {
+  color-scheme: dark;
+}
