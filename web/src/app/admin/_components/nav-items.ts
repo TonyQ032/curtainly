@@ -1,0 +1,27 @@
+/** Admin navigation. `issue` marks sections not built yet (shown as placeholders). */
+export type NavItem = { href: string; label: string; issue?: number };
+export type NavGroup = { label?: string; items: NavItem[] };
+
+export const NAV: NavGroup[] = [
+  { items: [{ href: '/admin', label: 'Overview' }] },
+  { items: [{ href: '/admin/review', label: 'Review queue', issue: 24 }] },
+  {
+    label: 'Registry',
+    items: [
+      { href: '/admin/regions', label: 'Regions' },
+      { href: '/admin/companies', label: 'Companies', issue: 11 },
+      { href: '/admin/venues', label: 'Venues', issue: 12 },
+      { href: '/admin/works', label: 'Works', issue: 13 },
+      { href: '/admin/sources', label: 'Sources', issue: 14 },
+      { href: '/admin/productions', label: 'Productions', issue: 15 },
+    ],
+  },
+  { items: [{ href: '/admin/coverage', label: 'Coverage', issue: 60 }] },
+];
+
+/** Placeholder sections, keyed by their path segment under /admin. */
+export const PLACEHOLDERS = new Map(
+  NAV.flatMap((g) => g.items)
+    .filter((i) => i.issue)
+    .map((i) => [i.href.replace('/admin/', ''), i] as const),
+);
