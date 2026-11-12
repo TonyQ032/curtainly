@@ -1,0 +1,3 @@
+# Gitignored files Claude Code copies into each new worktree it creates.
+# The apps read secrets from the root .env (web/next.config.ts, shared/drizzle.config.ts).
+.env

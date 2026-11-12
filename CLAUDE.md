@@ -39,6 +39,7 @@ pnpm workspace: `web/` (Next.js App Router), `ingest/` (adapters + runner, `tsx`
 ## Working on this repo
 
 - **One ticket per session.** Start a fresh session in this folder with "start on #N". Tickets that don't depend on each other can run in parallel sessions, each in its own worktree; dependent ones (e.g. #15 after #13 and #14) wait for the merge.
+- **Worktrees:** keep the main checkout on `main`; each ticket gets its own worktree. Claude Code copies the root `.env` into new worktrees via `.worktreeinclude` (it stays gitignored; never commit it). In a new worktree, run `pnpm install` first. Tag test rows with the ticket (`Zz Test #N …`) so parallel sessions don't delete each other's data; a second dev server falls back to the next free port. After merging, remove the worktree (`git worktree remove <path>`) and its local branch.
 - **Merging:** once a PR is open, ask the owner whether to merge. The usual answer is "merge when green": squash-merge with `--delete-branch` once all checks pass, sync local `main`, and confirm the issue closed and its card is in Done.
 - **Test against the real database** in the browser pane, using throwaway rows named `Zz Test …`. Delete them afterwards with a one-off script and report what remains; never leave test data behind. Cover the error paths too (validation, duplicate slug, values kept after an error).
 - **Stale dev server:** if a page shows old code or a hydration mismatch after editing shared components, stop `pnpm dev`, run `rm -rf web/.next`, and restart. Stop the dev server when the work is done.
