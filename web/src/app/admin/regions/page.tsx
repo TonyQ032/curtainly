@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { asc, count, ilike, or } from 'drizzle-orm';
 import { regions } from '@curtainly/shared/db/schema';
 import { requireAdmin } from '@/lib/auth';
@@ -14,7 +15,11 @@ export const metadata: Metadata = { title: 'Regions' };
 type Region = typeof regions.$inferSelect;
 
 const columns: Column<Region>[] = [
-  { key: 'name', header: 'Name', cell: (r) => r.name },
+  {
+    key: 'name',
+    header: 'Name',
+    cell: (r) => <Link href={`/admin/regions/${r.id}`}>{r.name}</Link>,
+  },
   { key: 'slug', header: 'Slug', cell: (r) => <code>{r.slug}</code> },
   { key: 'timezone', header: 'Timezone', cell: (r) => r.timezone },
   {
@@ -33,7 +38,7 @@ const columns: Column<Region>[] = [
 /**
  * Reference list page for the admin pattern: requireAdmin → parseListParams →
  * one query for rows + one for the total → DataTable + Pagination.
- * Create and edit arrive with #10.
+ * Create and edit live in new/ and [id]/ (form pattern: region-form.tsx + actions.ts).
  */
 export default async function RegionsPage({
   searchParams,
@@ -43,6 +48,7 @@ export default async function RegionsPage({
   await requireAdmin();
   const sp = await searchParams;
   const { q, page, pageSize, offset } = parseListParams(sp);
+  const saved = typeof sp.saved === 'string' ? sp.saved : undefined;
 
   const where = q
     ? or(ilike(regions.name, likePattern(q)), ilike(regions.slug, likePattern(q)))
@@ -63,9 +69,19 @@ export default async function RegionsPage({
   return (
     <>
       <PageHeader
+        actions={
+          <Link href="/admin/regions/new" className="button primary">
+            New region
+          </Link>
+        }
         title="Regions"
         description="Areas Curtainly covers. A region goes live once its coverage is proven."
       />
+      {saved && (
+        <p role="status" className="success notice">
+          Saved <code>{saved}</code>.
+        </p>
+      )}
       <ListToolbar q={q} placeholder="Search regions" />
       <DataTable
         columns={columns}
