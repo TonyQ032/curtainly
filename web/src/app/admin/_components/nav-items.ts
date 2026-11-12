@@ -9,7 +9,7 @@ export const NAV: NavGroup[] = [
     label: 'Registry',
     items: [
       { href: '/admin/regions', label: 'Regions' },
-      { href: '/admin/companies', label: 'Companies', issue: 11 },
+      { href: '/admin/companies', label: 'Companies' },
       { href: '/admin/venues', label: 'Venues', issue: 12 },
       { href: '/admin/works', label: 'Works', issue: 13 },
       { href: '/admin/sources', label: 'Sources', issue: 14 },

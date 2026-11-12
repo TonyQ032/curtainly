@@ -1,28 +1,18 @@
 'use server';
 
-import { slugify, uniqueSlug } from '@curtainly/shared';
+import { slugify } from '@curtainly/shared';
 import { regions } from '@curtainly/shared/db/schema';
-import { and, eq, like, ne } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { fieldError, isUniqueViolation } from '@/lib/form-errors';
 import { parseForm, type FormState } from '@/lib/forms';
+import { generateSlug, isSlugInUse } from '@/lib/slugs';
 import { regionFormSchema, type RegionFormInput } from './schema';
 
-function isUniqueViolation(err: unknown): boolean {
-  const e = err as { code?: string; cause?: { code?: string } };
-  return e?.code === '23505' || e?.cause?.code === '23505';
-}
-
-function slugTaken(state: FormState | undefined, formData: FormData): FormState {
-  return {
-    status: 'error',
-    message: 'Please fix the highlighted fields.',
-    fieldErrors: { slug: ['Another region already uses this slug'] },
-    values: state?.values ?? Object.fromEntries([...formData].map(([k, v]) => [k, String(v)])),
-  };
-}
+const SLUG_TAKEN = { slug: ['Another region already uses this slug'] };
 
 function toRow(input: RegionFormInput, slug: string) {
   return {
@@ -33,18 +23,6 @@ function toRow(input: RegionFormInput, slug: string) {
     radiusMiles: input.radiusMiles,
     status: input.status,
   };
-}
-
-/** Is `slug` used by a region other than `exceptId`? */
-async function isSlugInUse(slug: string, exceptId?: string) {
-  const rows = await db()
-    .select({ id: regions.id })
-    .from(regions)
-    .where(
-      exceptId ? and(eq(regions.slug, slug), ne(regions.id, exceptId)) : eq(regions.slug, slug),
-    )
-    .limit(1);
-  return rows.length > 0;
 }
 
 function done(slug: string): never {
@@ -60,24 +38,16 @@ export async function createRegion(_prev: FormState, formData: FormData): Promis
 
   let slug = input.slug;
   if (slug) {
-    if (await isSlugInUse(slug)) return slugTaken(undefined, formData);
+    if (await isSlugInUse(regions, slug)) return fieldError(formData, SLUG_TAKEN);
   } else {
     // Generated from the name: take the first free one (name, name-2, …).
-    const base = slugify(input.name) || 'region';
-    const taken = await db()
-      .select({ slug: regions.slug })
-      .from(regions)
-      .where(like(regions.slug, `${base}%`));
-    slug = uniqueSlug(
-      base,
-      taken.map((r) => r.slug),
-    );
+    slug = await generateSlug(regions, input.name, 'region');
   }
 
   try {
     await db().insert(regions).values(toRow(input, slug));
   } catch (err) {
-    if (isUniqueViolation(err)) return slugTaken(undefined, formData);
+    if (isUniqueViolation(err)) return fieldError(formData, SLUG_TAKEN);
     throw err;
   }
   done(slug);
@@ -95,13 +65,9 @@ export async function updateRegion(
 
   const slug = input.slug || slugify(input.name);
   if (!slug) {
-    return {
-      status: 'error',
-      message: 'Please fix the highlighted fields.',
-      fieldErrors: { slug: ['Slug is required'] },
-    };
+    return fieldError(formData, { slug: ['Slug is required'] });
   }
-  if (await isSlugInUse(slug, id)) return slugTaken(undefined, formData);
+  if (await isSlugInUse(regions, slug, id)) return fieldError(formData, SLUG_TAKEN);
 
   try {
     const updated = await db()
@@ -111,7 +77,7 @@ export async function updateRegion(
       .returning({ id: regions.id });
     if (updated.length === 0) return { status: 'error', message: 'This region no longer exists.' };
   } catch (err) {
-    if (isUniqueViolation(err)) return slugTaken(undefined, formData);
+    if (isUniqueViolation(err)) return fieldError(formData, SLUG_TAKEN);
     throw err;
   }
   done(slug);
