@@ -201,6 +201,8 @@ export const sources = pgTable('sources', {
   lastRunAt: timestamp('last_run_at', { withTimezone: true }),
   lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
   lastItemCount: integer('last_item_count'),
+  /** Last successful run that returned at least one item; drives the zero-items health rule. */
+  lastItemsAt: timestamp('last_items_at', { withTimezone: true }),
   lastError: text('last_error'),
   health: sourceHealthEnum('health').notNull().default('unknown'),
   ...timestamps,

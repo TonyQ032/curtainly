@@ -2,6 +2,16 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-12: Ingest runner (#20)
+
+**Sources gain `last_items_at`**: the last successful run that returned at least one item. The "zero items for 3+ days when it normally returns items" rule needs it; `last_success_at` can't serve, because it advances on zero-item runs too.
+
+**Source failures don't fail the job.** The Actions run exits 0 when individual sources fail; that is recorded as source health and shown in the run summary. It exits 1 only when the run itself can't proceed (database unreachable, unknown `INGEST_SOURCE_ID`).
+
+**`INGEST_SOURCE_ID` runs that source even when it is disabled**, so a source can be tried before it is switched on. `manual` and `submission` sources are never run.
+
+**Up to 4 sources run at once.** Per-host politeness is enforced by the shared polite fetch, so parallel sources on the same platform still queue behind each other.
+
 ## 2026-11-12: San Diego registry seed (#16)
 
 **78 companies, not 100–140.** The seed lists only companies confirmed active in 2026 and in scope: 52 in scope and active (12 professional, 16 indie & fringe, 13 community, 11 college), 5 in scope but inactive, and 21 excluded. The 100–140 estimate assumed more small community groups than the research turned up. Data is in `shared/src/db/seed-data/san-diego-companies.ts`; sources are listed in its header.
