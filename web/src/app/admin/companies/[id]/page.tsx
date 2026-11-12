@@ -5,6 +5,7 @@ import { asc, eq } from 'drizzle-orm';
 import { companies, productions, regions, sources, venues } from '@curtainly/shared/db/schema';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { isUuid } from '@/lib/fields';
 import { DataTable, type Column } from '../../_components/data-table';
 import { PageHeader } from '../../_components/page-header';
 import { updateCompany } from '../actions';
@@ -12,10 +13,8 @@ import { CompanyForm } from '../company-form';
 
 type Props = { params: Promise<{ id: string }> };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 async function loadCompany(id: string) {
-  if (!UUID.test(id)) return undefined;
+  if (!isUuid(id)) return undefined;
   const [company] = await db().select().from(companies).where(eq(companies.id, id)).limit(1);
   return company;
 }

@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./db": "./src/db/index.ts",
-    "./db/schema": "./src/db/schema.ts"
+    "./db/schema": "./src/db/schema.ts",
+    "./geocode": "./src/geocode.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
