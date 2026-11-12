@@ -35,3 +35,12 @@ pnpm workspace: `web/` (Next.js App Router), `ingest/` (adapters + runner, `tsx`
 - Work is tracked as GitHub issues under milestones M0–M5 (MVP), then Phase 2 and Phase 3. Labels: `area:*` for package, `type:*`, `decision` for open choices.
 - Branch per issue (`<issue#>-short-name`), PR into `main`, reference the issue with `Closes #N`.
 - Kanban board: the [Curtainly project](https://github.com/users/TonyQ032/projects/4) (views: Board, By milestone, Decisions). Status flow: Backlog → Ready (current milestone) → In progress (branch cut) → In review (PR open) → Done (merged or closed). When starting or opening a PR for an issue, move its card with `gh project item-edit`.
+
+## Working on this repo
+
+- **One ticket per session.** Start a fresh session in this folder with "start on #N". Tickets that don't depend on each other can run in parallel sessions, each in its own worktree; dependent ones (e.g. #15 after #13 and #14) wait for the merge.
+- **Merging:** once a PR is open, ask the owner whether to merge. The usual answer is "merge when green": squash-merge with `--delete-branch` once all checks pass, sync local `main`, and confirm the issue closed and its card is in Done.
+- **Test against the real database** in the browser pane, using throwaway rows named `Zz Test …`. Delete them afterwards with a one-off script and report what remains; never leave test data behind. Cover the error paths too (validation, duplicate slug, values kept after an error).
+- **Stale dev server:** if a page shows old code or a hydration mismatch after editing shared components, stop `pnpm dev`, run `rm -rf web/.next`, and restart. Stop the dev server when the work is done.
+- **Secrets and sign-in stay with the owner.** They add secrets and env vars through the GitHub and Vercel websites, and sign in to `/admin` in the browser pane themselves. Never ask for secret values in chat, never type the password, and mask passwords when inspecting `.env`.
+- **Vercel env vars set so far:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `ADMIN_EMAILS`. Admin pages that read the database also need `DATABASE_URL` (Supabase transaction pooler, port 6543); the owner was asked to add it, but it hasn't been confirmed.
