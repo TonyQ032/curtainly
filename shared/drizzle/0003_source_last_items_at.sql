@@ -1,0 +1,1 @@
+ALTER TABLE "sources" ADD COLUMN "last_items_at" timestamp with time zone;
