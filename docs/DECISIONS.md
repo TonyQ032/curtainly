@@ -2,6 +2,21 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-11: Geocoding with Nominatim (#17)
+
+**Nominatim (OpenStreetMap's public geocoder), not Mapbox.** Free, no account or API key, and our volume is tiny: one lookup when a venue is saved, a few hundred venues in total. It follows the [usage policy](https://operations.osmfoundation.org/policies/nominatim/):
+
+- **Rate:** at most 1 request per second, enforced in `shared/src/geocode.ts` per process. Bulk seeding (#16) must go through the same function, one venue at a time.
+- **Caching:** results are stored on the venue. An address is looked up again only when it changes, or when both coordinates are cleared on purpose.
+- **Identity:** requests send `INGEST_USER_AGENT`, falling back to `CurtainlyBot/0.1 (+repo URL)`. Never a stock library user agent, and never personal details.
+- **Attribution:** "© OpenStreetMap contributors (ODbL)" is shown next to coordinates in the admin. The public map (M4) must show it too.
+- **Off switch:** setting `GEOCODER=off` stops all lookups without a deploy. Venues can still be saved with typed coordinates.
+- No autocomplete and no systematic queries: both are banned by the policy.
+
+**Lookups happen inside the save request**, so a save waits about a second for the lookup. That's fine for one venue at a time; revisit if saves feel slow.
+
+**Results are restricted to the US** (`countrycodes=us`), and a match farther from the region's center than its radius is saved but flagged. That usually means a wrong match or a typo. Typed coordinates always win over a lookup.
+
 ## 2026-11-11: Theater color theme (#79)
 
 **Plain CSS with tokens in one file.** All colors live in `web/src/app/theme.css`: a raw palette (curtain reds, brass, velvet darks, playbill paper) and semantic tokens built from it. This settles the color part of #42; typography and spacing stay open there.

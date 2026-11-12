@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { regions } from '@curtainly/shared/db/schema';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
+import { isUuid } from '@/lib/fields';
 import { PageHeader } from '../../_components/page-header';
 import { updateRegion } from '../actions';
 import { RegionForm } from '../region-form';
@@ -11,10 +12,8 @@ import { timeZoneOptions } from '../timezones';
 
 type Props = { params: Promise<{ id: string }> };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 async function loadRegion(id: string) {
-  if (!UUID.test(id)) return undefined;
+  if (!isUuid(id)) return undefined;
   const [region] = await db().select().from(regions).where(eq(regions.id, id)).limit(1);
   return region;
 }
