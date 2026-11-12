@@ -14,18 +14,23 @@ export function normalizeWebsite(raw: string): string | null {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-export const websiteField = z
-  .string()
-  .transform(normalizeWebsite)
-  .refine((url) => {
-    if (url === null) return true;
-    try {
-      const u = new URL(url);
-      return (u.protocol === 'https:' || u.protocol === 'http:') && u.hostname.includes('.');
-    } catch {
-      return false;
-    }
-  }, 'Enter a website like oldglobe.org');
+/** Optional http(s) URL; https:// is added when left off, blank → null. */
+export const urlField = (message: string) =>
+  z
+    .string()
+    .transform(normalizeWebsite)
+    .refine((url) => {
+      if (url === null) return true;
+      if (url.length > 2000) return false;
+      try {
+        const u = new URL(url);
+        return (u.protocol === 'https:' || u.protocol === 'http:') && u.hostname.includes('.');
+      } catch {
+        return false;
+      }
+    }, message);
+
+export const websiteField = urlField('Enter a website like oldglobe.org');
 
 /** Optional on create (generated from the name). */
 export const slugField = z

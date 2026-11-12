@@ -110,7 +110,10 @@ export default async function EditCompanyPage({ params }: Props) {
 
       <section className="related">
         <h2>Venues</h2>
-        <p className="muted">Venues used by this company&rsquo;s productions.</p>
+        <p className="muted">
+          Venues used by this company&rsquo;s productions.{' '}
+          <Link href={`/admin/productions/new?company=${company.id}`}>Add a production</Link>
+        </p>
         <DataTable
           columns={venueColumns}
           rows={companyVenues}
