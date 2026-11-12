@@ -1,28 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { CREDIT_ROLES, CREDIT_ROLE_LABELS } from '@curtainly/shared';
+import { useKeyedRows } from '../_components/use-keyed-rows';
 import { MAX_ALT_TITLES, MAX_CREDIT_ROWS, type CreditRow } from './schema';
-
-/** Rows with stable React keys, so removing one doesn't shift the others' inputs. */
-function useKeyed<T>(initial: T[]) {
-  const [state, setState] = useState(() => ({
-    nextKey: initial.length,
-    rows: initial.map((value, key) => ({ key, value })),
-  }));
-  return {
-    rows: state.rows,
-    add: (value: T) =>
-      setState((s) => ({ nextKey: s.nextKey + 1, rows: [...s.rows, { key: s.nextKey, value }] })),
-    remove: (key: number) =>
-      setState((s) => ({ ...s, rows: s.rows.filter((row) => row.key !== key) })),
-    update: (key: number, value: T) =>
-      setState((s) => ({
-        ...s,
-        rows: s.rows.map((row) => (row.key === key ? { ...row, value } : row)),
-      })),
-  };
-}
 
 function ErrorText({ id, error }: { id: string; error?: string }) {
   return error ? (
@@ -43,7 +23,7 @@ export function AltTitlesEditor({
   error?: string;
 }) {
   const initial = defaultValue.split('\n').filter((t) => t.trim());
-  const { rows, add, remove, update } = useKeyed(initial);
+  const { rows, add, remove, update } = useKeyedRows(initial);
   const errorId = `${name}-error`;
 
   return (
@@ -108,7 +88,7 @@ export function CreditsEditor({
   } catch {
     // Unreadable echo: start empty rather than crash.
   }
-  const { rows, add, remove, update } = useKeyed(initial);
+  const { rows, add, remove, update } = useKeyedRows(initial);
   const errorId = `${name}-error`;
   const blank = (): CreditRow => ({ role: defaultRole, customRole: '', names: '' });
 

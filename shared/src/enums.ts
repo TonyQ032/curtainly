@@ -26,6 +26,13 @@ export type RegionStatus = (typeof REGION_STATUSES)[number];
 export const PRODUCTION_STATUSES = ['draft', 'published', 'cancelled', 'archived'] as const;
 export type ProductionStatus = (typeof PRODUCTION_STATUSES)[number];
 
+export const PRODUCTION_STATUS_LABELS: Record<ProductionStatus, string> = {
+  draft: 'Draft',
+  published: 'Published',
+  cancelled: 'Cancelled',
+  archived: 'Archived',
+};
+
 export const SOURCE_KINDS = [
   'ticketmaster',
   'ovationtix',

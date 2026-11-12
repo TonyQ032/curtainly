@@ -2,6 +2,24 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-12: Manual production entry (#15)
+
+**Performances are entered in the venue's local time.** The form shows and accepts date + time in the timezone of the production venue's Region, and converts with `zonedToUtc` / `utcToZoned` in `@curtainly/shared` (plain `Intl`, no date library). Adapters should use the same helpers. A time skipped by a DST change moves one hour later; a repeated time takes the first instance.
+
+**Saving matches performances by start time.** Removed rows are deleted, new ones inserted, and rows at an unchanged time keep their id and get their venue and notes updated. A performance whose venue equals the production's venue is stored with no override.
+
+**Run dates can come from the performances.** Leaving the first or last date blank fills it from the earliest or latest performance. Typed dates must contain every performance, so a draft can still be saved with dates only (times not announced yet).
+
+**Rules enforced on save:**
+
+- **Same company + same Work + overlapping dates is refused**, with a link to the existing production (the plan's identity rule, applied to manual entry too).
+- **Publishing needs at least one performance** (browse is ordered by next performance) **and an in-scope company** (scope is by producer).
+- **`archived` can't be set by hand.** It's for the automatic archive after the end date; an archived production keeps the option so it can be re-saved.
+
+**New works can be created from the production form** with just a title and type. If the title matches an existing Work (normalized title, or an alt title), the form lists the matches and asks for confirmation, as on the Works page. Credits and alt titles are added on the Work's page afterwards.
+
+**Bulk add is a weekly schedule**: weekdays + a time per line (default Thu–Sat 7:30 PM and Sat–Sun 2 PM) between two dates, merged into the list without duplicates. Capped at 400 performances per production and a two-year span.
+
 ## 2026-11-12: Works admin (#13)
 
 **Duplicate check is a warning, not a block.** Saving a Work looks for other Works whose `normalized_title` equals the normalized title or any alt title being saved, or whose alt titles match one of those titles (ignoring case). If any exist, the form lists them and asks the admin to tick "It's a different work. Save anyway." Two different shows can share a title, so this can't be a unique constraint. On edit, only titles new to the Work are checked, so an accepted duplicate doesn't warn on every save.

@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { desc, eq } from 'drizzle-orm';
-import { PRODUCTION_STATUSES } from '@curtainly/shared';
+import { PRODUCTION_STATUS_LABELS, type ProductionStatus } from '@curtainly/shared';
 import { companies, productions, venues, works } from '@curtainly/shared/db/schema';
 import { requireAdmin } from '@/lib/auth';
+import { formatDateRange } from '@/lib/dates';
 import { db } from '@/lib/db';
 import { isUuid } from '@/lib/fields';
 import { DataTable, type Column } from '../../_components/data-table';
@@ -33,14 +34,22 @@ type ProductionRow = {
   venueName: string;
   startDate: string;
   endDate: string;
-  status: (typeof PRODUCTION_STATUSES)[number];
+  status: ProductionStatus;
 };
 
 const productionColumns: Column<ProductionRow>[] = [
-  { key: 'company', header: 'Company', cell: (p) => p.companyName },
+  {
+    key: 'company',
+    header: 'Company',
+    cell: (p) => <Link href={`/admin/productions/${p.id}`}>{p.companyName}</Link>,
+  },
   { key: 'venue', header: 'Venue', cell: (p) => p.venueName },
-  { key: 'dates', header: 'Dates', cell: (p) => `${p.startDate} – ${p.endDate}` },
-  { key: 'status', header: 'Status', cell: (p) => <span className="badge">{p.status}</span> },
+  { key: 'dates', header: 'Dates', cell: (p) => formatDateRange(p.startDate, p.endDate) },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (p) => <span className="badge">{PRODUCTION_STATUS_LABELS[p.status]}</span>,
+  },
 ];
 
 export default async function EditWorkPage({ params }: Props) {
@@ -85,17 +94,14 @@ export default async function EditWorkPage({ params }: Props) {
       <section className="related">
         <h2>Productions</h2>
         <p className="muted">
-          Every company&rsquo;s run of this work. Managed in Productions (#15).
+          Every company&rsquo;s run of this work.{' '}
+          <Link href={`/admin/productions/new?work=${work.id}`}>Add a production</Link>
         </p>
         <DataTable
           columns={productionColumns}
           rows={workProductions}
           rowKey={(p) => p.id}
-          empty={
-            <>
-              No productions yet. <Link href="/admin/productions">Productions</Link> link to works.
-            </>
-          }
+          empty="No productions yet."
         />
       </section>
     </>
