@@ -2,6 +2,24 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-12: San Diego registry seed (#16)
+
+**78 companies, not 100–140.** The seed lists only companies confirmed active in 2026 and in scope: 52 in scope and active (12 professional, 16 indie & fringe, 13 community, 11 college), 5 in scope but inactive, and 21 excluded. The 100–140 estimate assumed more small community groups than the research turned up. Data is in `shared/src/db/seed-data/san-diego-companies.ts`; sources are listed in its header.
+
+**Excluded orgs are rows with `in_scope = false`**, with the reason at the start of `notes` ("Excluded: youth-only"). Closed companies (SD Rep, Ion, OB Playhouse & Theatre Company) also get `active = false`. Keeping them in the registry stops them from being re-added and lets coverage show them as excluded.
+
+**In scope but `active = false`** when no 2026 activity was found and the website is gone: Intrepid, Common Ground Theatre, SDAART, Wildsong, Welk Resorts Theatre. Check these before switching the region to `live`.
+
+**Ticketing platform lives in the seed file and in `notes`, not in a column.** Read from each company's ticket links, so M3 can plan adapters without a schema change. Among the 52 active companies: Arts People 7, Spektrix 4 (Cygnet, Lamb's, North Coast Rep, New Village Arts; all on `purchase.<domain>`, and Spektrix has a public events API), ThunderTix 3, OvationTix 2, Tessitura (unverified) 2, Ticketmaster, AudienceView Unlimited, VBO, TicketOwl, Humanitix 1 each, plus a long tail of small tools (OnTheStage, Zeffy, Ticket Tailor, TicketLeap, Givebutter, Wix Events, Eventbrite), 11 college box offices and 8 unknown.
+
+**Mosaic Theatricals is the renamed CCAE Theatricals**, so it's one company.
+
+**Venues are not seeded.** Each company's usual venues are noted for reference; Venue rows (and their geocoding) happen as productions are entered.
+
+**Reseeding never overwrites** (matched by slug), so admin edits survive. Changing seed data later only affects new databases.
+
+**Leads not added (couldn't confirm they're active or in scope):** Uprise Theatre, Chalk Circle Collective, Poway Performing Arts Company, American History Theater, Mira Mesa Theatre Guild, Village Church Community Theater (Rancho Santa Fe), Cal State San Marcos theatre, East County Performing Arts Association (Julian), Arms Wide Open (El Cajon), Lyric Opera San Diego (would be excluded as opera), Mystery Cafe. Temecula's The Merc is inside the 45-mile radius but outside the county; decide when the region boundary is refined.
+
 ## 2026-11-12: Manual production entry (#15)
 
 **Performances are entered in the venue's local time.** The form shows and accepts date + time in the timezone of the production venue's Region, and converts with `zonedToUtc` / `utcToZoned` in `@curtainly/shared` (plain `Intl`, no date library). Adapters should use the same helpers. A time skipped by a DST change moves one hour later; a repeated time takes the first instance.
