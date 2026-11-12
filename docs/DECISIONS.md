@@ -2,6 +2,14 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-12: Works admin (#13)
+
+**Duplicate check is a warning, not a block.** Saving a Work looks for other Works whose `normalized_title` equals the normalized title or any alt title being saved, or whose alt titles match one of those titles (ignoring case). If any exist, the form lists them and asks the admin to tick "It's a different work. Save anyway." Two different shows can share a title, so this can't be a unique constraint. On edit, only titles new to the Work are checked, so an accepted duplicate doesn't warn on every save.
+
+**Credits keep the plan's shape** (`playwright`, `book`, `music`, `lyrics`, plus `other: { role, names }[]`). The editor merges rows for the same role, and display merges roles held by the same people ("Music & lyrics: Stephen Sondheim") via `creditLines` in `@curtainly/shared`.
+
+**Alt titles skip editions.** "JR.", "The Musical", "Youth Edition" and similar already normalize to the base title, so they don't need to be listed.
+
 ## 2026-11-11: Geocoding with Nominatim (#17)
 
 **Nominatim (OpenStreetMap's public geocoder), not Mapbox.** Free, no account or API key, and our volume is tiny: one lookup when a venue is saved, a few hundred venues in total. It follows the [usage policy](https://operations.osmfoundation.org/policies/nominatim/):

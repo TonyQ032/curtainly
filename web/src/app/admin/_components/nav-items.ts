@@ -11,7 +11,7 @@ export const NAV: NavGroup[] = [
       { href: '/admin/regions', label: 'Regions' },
       { href: '/admin/companies', label: 'Companies' },
       { href: '/admin/venues', label: 'Venues' },
-      { href: '/admin/works', label: 'Works', issue: 13 },
+      { href: '/admin/works', label: 'Works' },
       { href: '/admin/sources', label: 'Sources', issue: 14 },
       { href: '/admin/productions', label: 'Productions', issue: 15 },
     ],
