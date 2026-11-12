@@ -2,11 +2,14 @@
  * Seed reference data. Safe to rerun: existing rows (matched by slug) are left alone.
  * Usage: pnpm db:seed   (reads DATABASE_URL from the repo-root .env)
  *
- * The San Diego company registry (#16) will be added here.
+ * Companies come from seed-data/san-diego-companies.ts (#16).
  */
 import { existsSync } from 'node:fs';
 import { createDb } from './index';
-import { regions } from './schema';
+import { eq } from 'drizzle-orm';
+import { slugify } from '../slug';
+import { companies, regions } from './schema';
+import { SAN_DIEGO_COMPANIES, seedNotes } from './seed-data/san-diego-companies';
 
 const rootEnv = new URL('../../../.env', import.meta.url);
 if (!process.env.DATABASE_URL && existsSync(rootEnv)) process.loadEnvFile(rootEnv);
@@ -32,6 +35,30 @@ const seededRegions = await db
 
 console.log(
   `[seed] regions inserted: ${seededRegions.map((r) => r.slug).join(', ') || 'none (already present)'}`,
+);
+
+const [sd] = await db.select({ id: regions.id }).from(regions).where(eq(regions.slug, 'sd'));
+if (!sd) throw new Error('[seed] region "sd" missing');
+
+const seededCompanies = await db
+  .insert(companies)
+  .values(
+    SAN_DIEGO_COMPANIES.map((c) => ({
+      name: c.name,
+      slug: slugify(c.name),
+      tier: c.tier,
+      regionId: sd.id,
+      website: c.website,
+      active: c.active,
+      inScope: c.inScope,
+      notes: seedNotes(c),
+    })),
+  )
+  .onConflictDoNothing({ target: companies.slug })
+  .returning({ slug: companies.slug });
+
+console.log(
+  `[seed] companies inserted: ${seededCompanies.length} of ${SAN_DIEGO_COMPANIES.length} (others already present)`,
 );
 
 await db.$client.end();
