@@ -2,6 +2,16 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-12: Dedup and update diffs (#22)
+
+**Same Work means the candidate's normalized title equals the Work's normalized title or one of its alt titles**, not a fuzzy match. Dedup runs unattended, so a fuzzy hit could silently merge two different shows; anything less than an exact match becomes a new item, and the reviewer sees the fuzzy Work suggestions there. Dates overlap when the candidate's first-to-last performance (as local dates in the venue Region's timezone) shares a day with the production's run. If several productions match, the one sharing the most days wins. A candidate with no performances never matches.
+
+**Diffs compare upcoming performances only** (at or after the run time), because sources drop past performances from their listings. Prices, ticket URL, advisory and runtime are proposed when the candidate has a value that differs; a value the candidate leaves out is never proposed as cleared. New dates are proposed only when performances run outside the production's dates. Venue isn't compared: source venue names rarely match ours word for word, and a noisy diff would queue an item every run.
+
+**The diff is stored in a new `review_items.diff` column** (`ProductionDiff` in `@curtainly/shared`), next to `production_id`. An empty diff means unchanged: no ReviewItem. Dedup lives in `shared/src/production-diff.ts` so the review detail page (#25) can render and apply the same type.
+
+**The runner loads each company's productions ending in the last 365 days or later** once per source, and logs new / update / unchanged counts. Writing the items is #23.
+
 ## 2026-11-12: Work matching (#21)
 
 **Matching runs in memory, not with `pg_trgm`.** `suggestWorks(title, index)` in `@curtainly/shared` scores Works against a candidate title; `buildWorkIndex(works)` precomputes normalized titles and trigrams so the runner builds it once per run. The registry will hold a few thousand Works at most, so this needs no extension, migration or round trip per candidate, and it is unit-tested without a database. Revisit if Works grow past tens of thousands.

@@ -2,7 +2,13 @@
  * One ingest run: load sources, run each through its adapter, record health.
  * The database sits behind `SourceStore` so this can be tested without one.
  */
-import type { SourceHealth, SourceKind } from '@curtainly/shared';
+import {
+  dedupCandidate,
+  type DedupProduction,
+  type DedupResult,
+  type SourceHealth,
+  type SourceKind,
+} from '@curtainly/shared';
 import { isUnhealthy, runSource } from './runner';
 import type { Adapter, AdapterContext, SourceRef, SourceRunResult } from './types';
 
@@ -22,6 +28,12 @@ export interface SourceHealthUpdate {
   lastItemsAt?: Date;
   lastError: string | null;
   health: SourceHealth;
+}
+
+/** Existing productions to dedup candidates against. */
+export interface ProductionStore {
+  /** The company's productions that could still overlap a listed run. */
+  loadForCompany(companyId: string): Promise<DedupProduction[]>;
 }
 
 export interface SourceStore {
@@ -59,9 +71,26 @@ export interface SourceOutcome {
   ok: boolean;
   itemCount: number;
   candidateCount: number;
+  /** Dedup counts, present when a ProductionStore was given and loading succeeded. */
+  dedup?: DedupCounts;
   health?: SourceHealth;
   error?: string;
   ms: number;
+}
+
+export interface DedupCounts {
+  new: number;
+  updates: number;
+  /** Matched an existing production with nothing to change: no ReviewItem. */
+  unchanged: number;
+}
+
+export function countDedup(results: readonly DedupResult[]): DedupCounts {
+  return {
+    new: results.filter((r) => r.kind === 'new').length,
+    updates: results.filter((r) => r.kind === 'update').length,
+    unchanged: results.filter((r) => r.kind === 'unchanged').length,
+  };
 }
 
 export interface RunSummary {
@@ -71,10 +100,14 @@ export interface RunSummary {
   unhealthy: number;
   items: number;
   candidates: number;
+  /** Totals over sources that were deduped. */
+  dedup: DedupCounts;
 }
 
 export interface RunAllOptions {
   store: SourceStore;
+  /** When given, candidates are deduped against existing productions. */
+  productions?: ProductionStore;
   adapters: Partial<Record<SourceKind, Adapter>>;
   /** Shared by all sources in the run (one polite fetch per run). */
   fetch: typeof fetch;
@@ -124,13 +157,27 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
       log: (message) => log(`${prefix} ${message}`),
     };
     const result = await runSource(source, options.adapters[source.kind], ctx);
-    const update = healthUpdate(source, result, now());
+    const runAt = now();
+    const update = healthUpdate(source, result, runAt);
+
+    let dedup: DedupCounts | undefined;
+    if (options.productions && result.ok && result.candidates.length > 0) {
+      try {
+        const existing = await options.productions.loadForCompany(source.companyId);
+        // Writing new and update items to the review queue comes in #23.
+        dedup = countDedup(result.candidates.map((c) => dedupCandidate(c, existing, runAt)));
+      } catch (err) {
+        log(`${prefix} could not load productions for dedup: ${errorMessage(err)}`);
+      }
+    }
+
     const outcome: SourceOutcome = {
       sourceId: source.id,
       kind: source.kind,
       ok: result.ok,
       itemCount: result.itemCount,
       candidateCount: result.candidates.length,
+      dedup,
       health: update.health,
       error: result.error,
       ms: Date.now() - started,
@@ -142,7 +189,9 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
     }
     log(
       result.ok
-        ? `${prefix} ok: ${result.itemCount} item(s), ${result.candidates.length} candidate(s), ${update.health}`
+        ? `${prefix} ok: ${result.itemCount} item(s), ${result.candidates.length} candidate(s)` +
+            (dedup ? ` (${formatDedup(dedup)})` : '') +
+            `, ${update.health}`
         : `${prefix} failed: ${result.error}`,
     );
     return outcome;
@@ -165,7 +214,16 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
     unhealthy: ran.filter((o) => o.health === 'unhealthy').length,
     items: ran.reduce((sum, o) => sum + o.itemCount, 0),
     candidates: ran.reduce((sum, o) => sum + o.candidateCount, 0),
+    dedup: {
+      new: ran.reduce((sum, o) => sum + (o.dedup?.new ?? 0), 0),
+      updates: ran.reduce((sum, o) => sum + (o.dedup?.updates ?? 0), 0),
+      unchanged: ran.reduce((sum, o) => sum + (o.dedup?.unchanged ?? 0), 0),
+    },
   };
+}
+
+function formatDedup(d: DedupCounts) {
+  return `${d.new} new, ${d.updates} update(s), ${d.unchanged} unchanged`;
 }
 
 /** Plain-text summary for the Actions log. */
@@ -173,7 +231,8 @@ export function formatSummary(summary: RunSummary, ms: number): string {
   const lines = [
     `[ingest] ${summary.outcomes.length} source(s) in ${(ms / 1000).toFixed(1)}s: ` +
       `${summary.ok} ok, ${summary.failed} failed, ${summary.unhealthy} unhealthy; ` +
-      `${summary.items} item(s), ${summary.candidates} candidate(s)`,
+      `${summary.items} item(s), ${summary.candidates} candidate(s)` +
+      (summary.candidates > 0 ? ` (${formatDedup(summary.dedup)})` : ''),
   ];
   for (const o of summary.outcomes.filter((o) => !o.ok)) {
     lines.push(`  FAILED ${o.kind} ${o.sourceId}: ${o.error}`);
