@@ -7,6 +7,7 @@ import {
   type SourceStore,
   type StoredSource,
 } from './run';
+import type { DedupProduction } from '@curtainly/shared';
 import type { Adapter } from './types';
 
 const now = new Date('2027-01-10T12:00:00Z');
@@ -163,6 +164,86 @@ describe('runAll', () => {
     expect(summary.ok).toBe(2);
     expect(writes.has('c')).toBe(true);
     expect(logs.some((l) => l.includes('could not record health: db down'))).toBe(true);
+  });
+
+  it('dedups candidates against existing productions', async () => {
+    const existing: DedupProduction = {
+      id: 'p1',
+      companyId: 'c1',
+      workId: 'w1',
+      workNormalizedTitle: 'into the woods',
+      workAltTitles: [],
+      startDate: '2027-01-15',
+      endDate: '2027-01-31',
+      timeZone: 'America/Los_Angeles',
+      priceMin: '25.00',
+      priceMax: null,
+      ticketUrl: null,
+      advisory: null,
+      runtimeMin: null,
+      performances: [new Date('2027-01-16T03:30:00Z')],
+    };
+    const perf = [{ startsAt: '2027-01-15T19:30:00-08:00' }];
+    const adapter: Adapter = {
+      kind: 'jsonld',
+      fetch: async () => [{ data: 0 }],
+      normalize: (raw, src) => [
+        { title: 'Into the Woods', companyId: src.companyId, performances: perf, raw },
+        {
+          title: 'Into the Woods',
+          companyId: src.companyId,
+          performances: perf,
+          priceMin: 20,
+          raw,
+        },
+        { title: 'Company', companyId: src.companyId, performances: perf, raw },
+      ],
+    };
+    const { store } = memoryStore([source('a')]);
+    const loaded: string[] = [];
+    const logs: string[] = [];
+    const summary = await runAll({
+      store,
+      productions: {
+        async loadForCompany(companyId) {
+          loaded.push(companyId);
+          return [existing];
+        },
+      },
+      adapters: { jsonld: adapter },
+      fetch,
+      log: (m) => logs.push(m),
+      now: () => now,
+    });
+    expect(loaded).toEqual(['c1']);
+    expect(summary.dedup).toEqual({ new: 1, updates: 1, unchanged: 1 });
+    expect(summary.outcomes[0]?.dedup).toEqual({ new: 1, updates: 1, unchanged: 1 });
+    expect(logs.some((l) => l.includes('3 candidate(s) (1 new, 1 update(s), 1 unchanged)'))).toBe(
+      true,
+    );
+    expect(formatSummary(summary, 100)).toContain('(1 new, 1 update(s), 1 unchanged)');
+  });
+
+  it('still records health when productions fail to load', async () => {
+    const { store, writes } = memoryStore([source('a')]);
+    const logs: string[] = [];
+    const summary = await runAll({
+      store,
+      productions: {
+        async loadForCompany() {
+          throw new Error('db down');
+        },
+      },
+      adapters: { jsonld: fakeAdapter({ a: 1 }) },
+      fetch,
+      log: (m) => logs.push(m),
+      now: () => now,
+    });
+    expect(summary.outcomes[0]?.dedup).toBeUndefined();
+    expect(writes.get('a')).toMatchObject({ health: 'healthy' });
+    expect(logs.some((l) => l.includes('could not load productions for dedup: db down'))).toBe(
+      true,
+    );
   });
 
   it('respects the concurrency limit', async () => {

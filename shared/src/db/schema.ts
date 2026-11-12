@@ -36,6 +36,7 @@ import {
   TIERS,
   WORK_TYPES,
 } from '../enums';
+import type { ProductionDiff } from '../production-diff';
 
 export const tierEnum = pgEnum('tier', TIERS);
 export const workTypeEnum = pgEnum('work_type', WORK_TYPES);
@@ -217,6 +218,8 @@ export const reviewItems = pgTable(
     productionId: uuid('production_id').references(() => productions.id),
     payload: jsonb('payload').notNull(),
     proposed: jsonb('proposed').notNull(),
+    /** For updates (`production_id` set): what re-ingesting would change. Null for new items. */
+    diff: jsonb('diff').$type<ProductionDiff>(),
     matchSuggestions: jsonb('match_suggestions')
       .$type<{ workId: string; title: string; score: number }[]>()
       .notNull()
