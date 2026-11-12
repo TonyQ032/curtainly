@@ -420,6 +420,12 @@ a {
   flex-wrap: wrap;
 }
 
+.home-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .brand-title {
   color: var(--accent);
 }
