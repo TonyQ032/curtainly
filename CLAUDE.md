@@ -22,6 +22,7 @@ pnpm workspace: `web/` (Next.js App Router), `ingest/` (adapters + runner, `tsx`
 - `pnpm db:migrate` reads `DATABASE_URL` from the root `.env` (Supabase session pooler URL, port 5432).
 - Admin auth: every `/admin` page, Server Action and Route Handler calls `requireAdmin()` from `web/src/lib/auth.ts`. `web/src/proxy.ts` is only an optimistic pre-filter.
 - Admin pages follow `web/src/app/admin/regions/page.tsx`: `requireAdmin()` → `parseListParams()` → rows + count query → `DataTable` + `Pagination` (components in `web/src/app/admin/_components/`). Forms: a Server Action returning `FormState` via `parseForm(zodSchema, formData)` (`web/src/lib/forms.ts`) with `Field` / `FormMessage` / `SubmitButton`. Server code gets the DB from `db()` in `web/src/lib/db.ts`.
+- Slugs: `generateSlug` / `isSlugInUse` in `web/src/lib/slugs.ts`; form errors that keep typed values: `fieldError` in `web/src/lib/form-errors.ts`. List filters: `FilterSelect` inside `ListToolbar` (see `admin/companies/page.tsx`).
 - New admin sections: add the nav entry in `_components/nav-items.ts`; drop its `issue` once a real page exists (the `[section]` placeholder route serves it until then).
 - Colors: only tokens from `web/src/app/theme.css` (`var(--bg)`, `var(--accent)`…), never hex values in components or other CSS. New tokens go in theme.css and in `web/src/app/admin/theme/tokens.ts` (the `/admin/theme` preview). Keep AA contrast.
 - PostGIS points use `mode: 'xy'`: x = longitude, y = latitude.

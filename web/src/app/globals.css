@@ -241,13 +241,23 @@ button:disabled {
 
 .search {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   flex: 1 1 280px;
   max-width: 420px;
 }
 
+.search:has(.filter) {
+  max-width: none;
+}
+
+.search .filter {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .search input {
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 0;
 }
 
@@ -547,4 +557,23 @@ a {
 
 .notice {
   margin-bottom: 12px;
+}
+
+.related {
+  margin-top: 40px;
+  max-width: 900px;
+}
+
+.related h2 {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
+}
+
+.related > p {
+  margin: 0 0 12px;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
 }
