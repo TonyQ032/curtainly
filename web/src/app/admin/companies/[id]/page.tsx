@@ -27,7 +27,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 type SourceRow = typeof sources.$inferSelect;
 const sourceColumns: Column<SourceRow>[] = [
-  { key: 'kind', header: 'Kind', cell: (s) => <code>{s.kind}</code> },
+  {
+    key: 'kind',
+    header: 'Kind',
+    cell: (s) => <Link href={`/admin/sources/${s.id}`}>{s.kind}</Link>,
+  },
   {
     key: 'enabled',
     header: 'Enabled',
@@ -92,7 +96,9 @@ export default async function EditCompanyPage({ params }: Props) {
       <section className="related">
         <h2>Sources</h2>
         <p className="muted">
-          How listings for this company reach Curtainly. Managed in Sources (#14).
+          How listings for this company reach Curtainly.{' '}
+          <Link href={`/admin/sources/new?company=${company.id}`}>Add a source</Link> or edit one in{' '}
+          <Link href="/admin/sources">Sources</Link>.
         </p>
         <DataTable
           columns={sourceColumns}
