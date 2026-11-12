@@ -14,6 +14,12 @@ export const TIER_LABELS: Record<Tier, string> = {
 export const WORK_TYPES = ['play', 'musical', 'other'] as const;
 export type WorkType = (typeof WORK_TYPES)[number];
 
+export const WORK_TYPE_LABELS: Record<WorkType, string> = {
+  play: 'Play',
+  musical: 'Musical',
+  other: 'Other',
+};
+
 export const REGION_STATUSES = ['planned', 'building', 'live'] as const;
 export type RegionStatus = (typeof REGION_STATUSES)[number];
 
