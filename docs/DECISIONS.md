@@ -2,6 +2,12 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-12: Work matching (#21)
+
+**Matching runs in memory, not with `pg_trgm`.** `suggestWorks(title, index)` in `@curtainly/shared` scores Works against a candidate title; `buildWorkIndex(works)` precomputes normalized titles and trigrams so the runner builds it once per run. The registry will hold a few thousand Works at most, so this needs no extension, migration or round trip per candidate, and it is unit-tested without a database. Revisit if Works grow past tens of thousands.
+
+**Scores are rule-based first, trigram second**, so the reviewer sees why something matched: exact normalized title 1.0, alt title 0.98, equal after dropping a subtitle ("Hamilton: An American Musical") 0.9, one title's words inside the other ("Disney's Beauty and the Beast") 0.6–0.88 by coverage, and otherwise pg_trgm-style trigram similarity capped at 0.85. Each Work appears once (its best title or alt title); the default is the top 5 scoring at least 0.3. Titles under 4 characters don't match by containment.
+
 ## 2026-11-12: Ingest runner (#20)
 
 **Sources gain `last_items_at`**: the last successful run that returned at least one item. The "zero items for 3+ days when it normally returns items" rule needs it; `last_success_at` can't serve, because it advances on zero-item runs too.
