@@ -2,6 +2,14 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-13: Review queue list (#24)
+
+**"Type" is new or update**, derived from `review_items.production_id`; "Source" filters by source kind (Ticketmaster, JSON-LD, Public submission…). The list shows pending items only, newest first by `created_at`.
+
+**Error reports join the list when #56 builds them.** Reports stay in their own `reports` table (they point at a production, not a proposed one) and will appear here as a third type, "Report", rather than being copied into `review_items`.
+
+**The nav shows the pending count** next to "Review queue", queried in the admin layout. Layouts persist across client navigation, so the review actions (#25) revalidate the admin layout to keep it current.
+
 ## 2026-11-13: Writing candidates to the review queue (#23)
 
 **One pending item per source and candidate key.** `review_items.candidate_key` is the upstream id (`external:<id>`) or, without one, the normalized title (`title:<…>`). A partial unique index on `(source_id, candidate_key) where status = 'pending'` lets reruns upsert: the pending item is rewritten only when what the reviewer sees changed (proposed production, diff, linked production, Work suggestions). A raw-payload-only change, such as seats left, doesn't touch it. A key-based item also moves from "new" to "update" in place if the production gets created by other means.
