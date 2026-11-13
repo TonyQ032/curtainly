@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { count, eq } from 'drizzle-orm';
+import { reviewItems } from '@curtainly/shared/db/schema';
 import { requireAdmin } from '@/lib/auth';
+import { db } from '@/lib/db';
 import { logout } from '../login/actions';
 import { AdminNav } from './_components/admin-nav';
 
@@ -12,6 +15,12 @@ export const metadata: Metadata = {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { email } = await requireAdmin();
+  // Layouts persist across client navigation, so this refreshes on a full load or when an
+  // action revalidates the admin layout (review actions should: revalidatePath('/admin', 'layout')).
+  const [pending] = await db()
+    .select({ n: count() })
+    .from(reviewItems)
+    .where(eq(reviewItems.status, 'pending'));
 
   return (
     <div className="admin">
@@ -29,7 +38,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       </header>
       <div className="admin-body">
-        <AdminNav />
+        <AdminNav counts={{ '/admin/review': pending?.n ?? 0 }} />
         <main className="admin-main">{children}</main>
       </div>
     </div>
