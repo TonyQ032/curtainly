@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { NAV } from './nav-items';
 
-export function AdminNav() {
+/** `counts` adds a number after a section's label, keyed by href (e.g. pending review items). */
+export function AdminNav({ counts = {} }: { counts?: Record<string, number> }) {
   const pathname = usePathname();
   const isActive = (href: string) =>
     href === '/admin' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -22,6 +23,12 @@ export function AdminNav() {
               className={item.issue ? 'pending' : undefined}
             >
               {item.label}
+              {counts[item.href] ? (
+                <span className="nav-count">
+                  {counts[item.href]}
+                  <span className="visually-hidden"> pending</span>
+                </span>
+              ) : null}
             </Link>
           ))}
         </div>

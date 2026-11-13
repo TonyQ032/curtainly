@@ -324,7 +324,8 @@ async function approveReview(
 
 async function finish(slug: string, review: Review | undefined): Promise<never> {
   if (!review) done(slug);
-  revalidatePath('/admin/review');
+  // The admin layout shows the pending count in the nav.
+  revalidatePath('/admin', 'layout');
   revalidatePath('/admin/productions');
   revalidatePath('/admin/works');
   const nextId = await nextPendingItem(review.id);

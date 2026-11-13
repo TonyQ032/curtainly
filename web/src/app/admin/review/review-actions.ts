@@ -62,7 +62,8 @@ async function inTransaction(
 
 /** Back to the queue: the next pending item, or the list when it's empty. */
 async function next(id: string): Promise<never> {
-  revalidatePath('/admin/review');
+  // The admin layout shows the pending count in the nav.
+  revalidatePath('/admin', 'layout');
   revalidatePath('/admin/productions');
   const nextId = await nextPendingItem(id);
   redirect(nextId ? `/admin/review/${nextId}` : '/admin/review');
