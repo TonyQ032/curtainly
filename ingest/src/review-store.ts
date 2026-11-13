@@ -1,8 +1,14 @@
 import { applyProductionDiff, type DbExecutor } from '@curtainly/shared/db/apply-diff';
 import type { Db } from '@curtainly/shared/db';
 import { reviewItems, works } from '@curtainly/shared/db/schema';
-import { and, eq, ne, or, sql } from 'drizzle-orm';
-import type { QueueCounts, QueueEntry, ReviewQueueStore } from './review-queue';
+import { and, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
+import {
+  dropDismissed,
+  type Dismissals,
+  type QueueCounts,
+  type QueueEntry,
+  type ReviewQueueStore,
+} from './review-queue';
 
 /** `review_items.reviewer` for updates published by an auto-approve source. */
 export const AUTO_REVIEWER = 'auto-approve';
@@ -36,6 +42,32 @@ async function clearSuperseded(db: DbExecutor, sourceId: string, entry: QueueEnt
   return rows.length;
 }
 
+/** Keys a reviewer marked "not a show" and proposals they rejected, for one source. */
+async function loadDismissals(db: Db, sourceId: string): Promise<Dismissals> {
+  const rows = await db
+    .select({
+      key: reviewItems.candidateKey,
+      status: reviewItems.status,
+      proposed: reviewItems.proposed,
+    })
+    .from(reviewItems)
+    .where(
+      and(
+        eq(reviewItems.sourceId, sourceId),
+        isNotNull(reviewItems.candidateKey),
+        inArray(reviewItems.status, ['not_a_show', 'rejected']),
+      ),
+    );
+  const notAShow = new Set<string>();
+  const rejected = new Map<string, unknown[]>();
+  for (const row of rows) {
+    if (!row.key) continue;
+    if (row.status === 'not_a_show') notAShow.add(row.key);
+    else rejected.set(row.key, [...(rejected.get(row.key) ?? []), row.proposed]);
+  }
+  return { notAShow, rejected };
+}
+
 /** ReviewQueueStore backed by `review_items`. */
 export function dbReviewQueue(db: Db): ReviewQueueStore {
   return {
@@ -51,9 +83,19 @@ export function dbReviewQueue(db: Db): ReviewQueueStore {
     },
 
     async write(source, plan, now) {
-      const counts: QueueCounts = { created: 0, updated: 0, autoApproved: 0, cleared: 0 };
+      const { entries, dismissed } = dropDismissed(
+        plan.entries,
+        await loadDismissals(db, source.id),
+      );
+      const counts: QueueCounts = {
+        created: 0,
+        updated: 0,
+        autoApproved: 0,
+        cleared: 0,
+        dismissed,
+      };
 
-      for (const entry of plan.entries) {
+      for (const entry of entries) {
         if (entry.kind === 'update' && entry.diff && entry.productionId && source.autoApprove) {
           const { productionId, diff } = entry;
           await db.transaction(async (tx) => {

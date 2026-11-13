@@ -168,6 +168,44 @@ export function planReviewItems(
   return plan;
 }
 
+/**
+ * Candidates a reviewer already closed for a source: keys marked "not a show"
+ * (never queued again) and, per key, the proposals that were rejected (not
+ * queued again until what the source lists changes).
+ */
+export interface Dismissals {
+  notAShow: ReadonlySet<string>;
+  rejected: ReadonlyMap<string, readonly unknown[]>;
+}
+
+/** JSON with object keys sorted, so values read back from `jsonb` compare equal. */
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : v,
+  );
+}
+
+/** Split entries into those to queue and those a reviewer already dismissed. */
+export function dropDismissed(
+  entries: readonly QueueEntry[],
+  dismissals: Dismissals,
+): { entries: QueueEntry[]; dismissed: number } {
+  const kept: QueueEntry[] = [];
+  let dismissed = 0;
+  for (const entry of entries) {
+    const proposed = canonicalJson(entry.proposed);
+    const rejected = dismissals.rejected.get(entry.key) ?? [];
+    if (dismissals.notAShow.has(entry.key) || rejected.some((r) => canonicalJson(r) === proposed)) {
+      dismissed++;
+    } else {
+      kept.push(entry);
+    }
+  }
+  return { entries: kept, dismissed };
+}
+
 export interface QueueCounts {
   /** New pending items. */
   created: number;
@@ -177,14 +215,17 @@ export interface QueueCounts {
   autoApproved: number;
   /** Stale pending items removed because their production no longer needs a change. */
   cleared: number;
+  /** Entries not queued because a reviewer marked them "not a show" or rejected the same proposal. */
+  dismissed: number;
 }
 
 export interface ReviewQueueStore {
   /** Every Work, for match suggestions. Called once per run. */
   loadWorks(): Promise<MatchableWork[]>;
   /**
-   * Write a source's plan: upsert one pending item per entry key, publish
-   * updates directly when `autoApprove`, and clear stale pending items.
+   * Write a source's plan: drop dismissed entries, upsert one pending item per
+   * entry key, publish updates directly when `autoApprove`, and clear stale
+   * pending items.
    */
   write(
     source: { id: string; autoApprove: boolean },

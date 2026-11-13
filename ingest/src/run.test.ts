@@ -210,7 +210,7 @@ describe('runAll', () => {
       async write(source, plan) {
         if (opts.failWrite) throw new Error('queue down');
         writes.push({ source: { id: source.id, autoApprove: source.autoApprove }, plan });
-        return { created: 2, updated: 0, autoApproved: 0, cleared: 1 };
+        return { created: 2, updated: 0, autoApproved: 0, cleared: 1, dismissed: 0 };
       },
     };
     return { queue, writes, worksLoads: () => worksLoads };
@@ -270,7 +270,13 @@ describe('runAll', () => {
     ]);
     expect(plan.entries[1]?.matchSuggestions[0]).toMatchObject({ workId: 'w9', kind: 'exact' });
     expect(plan.unchanged).toEqual([{ key: 'title:into the woods', productionId: 'p1' }]);
-    expect(summary.queue).toEqual({ created: 4, updated: 0, autoApproved: 0, cleared: 2 });
+    expect(summary.queue).toEqual({
+      created: 4,
+      updated: 0,
+      autoApproved: 0,
+      cleared: 2,
+      dismissed: 0,
+    });
     expect(logs.some((l) => l.includes('queue: 2 created, 0 updated, 0 auto-approved'))).toBe(true);
     expect(formatSummary(summary, 100)).toContain('review queue: 4 created');
   });

@@ -746,3 +746,60 @@ textarea.mono {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/* ---------- Review item ---------- */
+
+.review-meta {
+  margin-bottom: 24px;
+}
+
+/* Proposed production beside the raw payload; stacked on narrow screens. */
+.review-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.review-columns h2,
+.review-action h3 {
+  margin: 0 0 8px;
+  font-size: 1.125rem;
+}
+
+.review-action h3 {
+  font-size: 1rem;
+}
+
+.review-action {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+.review-action .form {
+  max-width: 560px;
+}
+
+.raw-item p {
+  margin: 0 0 4px;
+}
+
+.raw-json {
+  margin: 0;
+  padding: 12px;
+  max-height: 480px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.plain-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}

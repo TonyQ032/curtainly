@@ -19,6 +19,13 @@ import { fieldError, isUniqueViolation } from '@/lib/form-errors';
 import { parseForm } from '@/lib/forms';
 import { likePattern } from '@/lib/list-params';
 import { generateSlug, isSlugInUse } from '@/lib/slugs';
+import {
+  AlreadyReviewedError,
+  closeReviewItem,
+  learnAltTitle,
+  loadReviewItem,
+  nextPendingItem,
+} from '../review/review-data';
 import type { ProductionFormState, WorkOption } from './form-state';
 import { productionFormSchema, type ProductionFormInput } from './schema';
 
@@ -277,6 +284,53 @@ function slugSource(ctx: Context, input: ProductionFormInput) {
   return `${ctx.work.title} ${ctx.company.name} ${input.startDate.slice(0, 4)}`;
 }
 
+type Review = { id: string; title: string | undefined };
+
+const REVIEW_CLOSED: ProductionFormState = {
+  status: 'error',
+  message: 'The review item was already reviewed, so nothing was saved. Go back to the queue.',
+};
+
+/**
+ * "Edit then approve": the pending review item this save approves. A new
+ * production approves a new item; an edit approves an update to that production.
+ */
+async function reviewToApprove(
+  input: ProductionFormInput,
+  productionId?: string,
+): Promise<{ ok: true; review?: Review } | { ok: false; state: ProductionFormState }> {
+  if (!input.reviewItemId) return { ok: true };
+  const row = await loadReviewItem(input.reviewItemId);
+  if (!row || row.item.status !== 'pending') return { ok: false, state: REVIEW_CLOSED };
+  if ((row.item.productionId ?? undefined) !== productionId) {
+    return {
+      ok: false,
+      state: { status: 'error', message: 'This review item is for a different production.' },
+    };
+  }
+  return { ok: true, review: { id: row.item.id, title: row.proposed?.title } };
+}
+
+/** Inside the save's transaction: learn the source's title and close the item. */
+async function approveReview(
+  tx: Tx,
+  review: Review | undefined,
+  { reviewer, productionId, workId }: { reviewer: string; productionId: string; workId: string },
+) {
+  if (!review) return;
+  if (review.title) await learnAltTitle(tx, workId, review.title);
+  await closeReviewItem(tx, review.id, { status: 'approved', reviewer, productionId });
+}
+
+async function finish(slug: string, review: Review | undefined): Promise<never> {
+  if (!review) done(slug);
+  revalidatePath('/admin/review');
+  revalidatePath('/admin/productions');
+  revalidatePath('/admin/works');
+  const nextId = await nextPendingItem(review.id);
+  redirect(nextId ? `/admin/review/${nextId}` : '/admin/review');
+}
+
 function done(slug: string): never {
   revalidatePath('/admin/productions');
   revalidatePath('/admin/works');
@@ -287,7 +341,7 @@ export async function createProduction(
   _prev: ProductionFormState,
   formData: FormData,
 ): Promise<ProductionFormState> {
-  await requireAdmin();
+  const { email } = await requireAdmin();
   const parsed = parseForm(productionFormSchema, formData);
   if (!parsed.ok) return parsed.state;
   const input = parsed.data;
@@ -295,6 +349,9 @@ export async function createProduction(
   if (input.slug && (await isSlugInUse(productions, input.slug))) {
     return fieldError(formData, SLUG_TAKEN);
   }
+  const reviewing = await reviewToApprove(input);
+  if (!reviewing.ok) return reviewing.state;
+  const { review } = reviewing;
   const loaded = await loadContext(input, formData);
   if (!loaded.ok) return loaded.state;
   const { ctx } = loaded;
@@ -322,12 +379,18 @@ export async function createProduction(
         performanceValues(input, production!.id, ctx.timezone),
         true,
       );
+      await approveReview(tx, review, {
+        reviewer: email,
+        productionId: production!.id,
+        workId: workId!,
+      });
     });
   } catch (err) {
     if (isUniqueViolation(err)) return fieldError(formData, SLUG_TAKEN);
+    if (err instanceof AlreadyReviewedError) return REVIEW_CLOSED;
     throw err;
   }
-  done(slug);
+  return finish(slug, review);
 }
 
 export async function updateProduction(
@@ -335,7 +398,7 @@ export async function updateProduction(
   _prev: ProductionFormState,
   formData: FormData,
 ): Promise<ProductionFormState> {
-  await requireAdmin();
+  const { email } = await requireAdmin();
   const parsed = parseForm(productionFormSchema, formData);
   if (!parsed.ok) return parsed.state;
   const input = parsed.data;
@@ -346,6 +409,9 @@ export async function updateProduction(
   if (input.slug && (await isSlugInUse(productions, input.slug, id))) {
     return fieldError(formData, SLUG_TAKEN);
   }
+  const reviewing = await reviewToApprove(input, id);
+  if (!reviewing.ok) return reviewing.state;
+  const { review } = reviewing;
   const loaded = await loadContext(input, formData, previous);
   if (!loaded.ok) return loaded.state;
   const { ctx } = loaded;
@@ -375,10 +441,12 @@ export async function updateProduction(
         .set({ ...productionRow(input), slug, workId: workId! })
         .where(eq(productions.id, id));
       await syncPerformances(tx, id, performanceValues(input, id, ctx.timezone), false);
+      await approveReview(tx, review, { reviewer: email, productionId: id, workId: workId! });
     });
   } catch (err) {
     if (isUniqueViolation(err)) return fieldError(formData, SLUG_TAKEN);
+    if (err instanceof AlreadyReviewedError) return REVIEW_CLOSED;
     throw err;
   }
-  done(slug);
+  return finish(slug, review);
 }

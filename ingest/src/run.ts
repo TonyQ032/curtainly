@@ -271,6 +271,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
       updated: ran.reduce((sum, o) => sum + (o.queue?.updated ?? 0), 0),
       autoApproved: ran.reduce((sum, o) => sum + (o.queue?.autoApproved ?? 0), 0),
       cleared: ran.reduce((sum, o) => sum + (o.queue?.cleared ?? 0), 0),
+      dismissed: ran.reduce((sum, o) => sum + (o.queue?.dismissed ?? 0), 0),
     },
   };
 }
@@ -282,7 +283,7 @@ function formatDedup(d: DedupCounts) {
 function formatQueue(q: QueueCounts) {
   return (
     `${q.created} created, ${q.updated} updated, ${q.autoApproved} auto-approved, ` +
-    `${q.cleared} cleared`
+    `${q.cleared} cleared, ${q.dismissed} dismissed`
   );
 }
 
@@ -295,7 +296,7 @@ export function formatSummary(summary: RunSummary, ms: number): string {
       (summary.candidates > 0 ? ` (${formatDedup(summary.dedup)})` : ''),
   ];
   const q = summary.queue;
-  if (q.created + q.updated + q.autoApproved + q.cleared > 0) {
+  if (q.created + q.updated + q.autoApproved + q.cleared + q.dismissed > 0) {
     lines.push(`  review queue: ${formatQueue(q)}`);
   }
   for (const o of summary.outcomes.filter((o) => !o.ok)) {
