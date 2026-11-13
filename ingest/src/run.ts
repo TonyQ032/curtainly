@@ -1,14 +1,21 @@
 /**
- * One ingest run: load sources, run each through its adapter, record health.
- * The database sits behind `SourceStore` so this can be tested without one.
+ * One ingest run: load sources, run each through its adapter, dedup the
+ * candidates, write them to the review queue and record health. The database
+ * sits behind store interfaces so this can be tested without one.
  */
 import {
-  dedupCandidate,
+  buildWorkIndex,
   type DedupProduction,
-  type DedupResult,
   type SourceHealth,
   type SourceKind,
+  type WorkIndex,
 } from '@curtainly/shared';
+import {
+  planReviewItems,
+  type QueueCounts,
+  type ReviewPlan,
+  type ReviewQueueStore,
+} from './review-queue';
 import { isUnhealthy, runSource } from './runner';
 import type { Adapter, AdapterContext, SourceRef, SourceRunResult } from './types';
 
@@ -18,6 +25,8 @@ export const NON_ADAPTER_KINDS: readonly SourceKind[] = ['manual', 'submission']
 /** A Source row as the runner sees it: the adapter's view plus the health fields. */
 export interface StoredSource extends SourceRef {
   enabled: boolean;
+  /** Updates publish directly (still logged as approved ReviewItems). */
+  autoApprove: boolean;
   lastItemsAt: Date | null;
 }
 
@@ -73,11 +82,14 @@ export interface SourceOutcome {
   candidateCount: number;
   /** Dedup counts, present when a ProductionStore was given and loading succeeded. */
   dedup?: DedupCounts;
+  /** Review-queue writes, present when a ReviewQueueStore was given and writing succeeded. */
+  queue?: QueueCounts;
   health?: SourceHealth;
   error?: string;
   ms: number;
 }
 
+/** Counted after merging candidates that refer to the same production. */
 export interface DedupCounts {
   new: number;
   updates: number;
@@ -85,11 +97,11 @@ export interface DedupCounts {
   unchanged: number;
 }
 
-export function countDedup(results: readonly DedupResult[]): DedupCounts {
+export function countDedup(plan: ReviewPlan): DedupCounts {
   return {
-    new: results.filter((r) => r.kind === 'new').length,
-    updates: results.filter((r) => r.kind === 'update').length,
-    unchanged: results.filter((r) => r.kind === 'unchanged').length,
+    new: plan.entries.filter((e) => e.kind === 'new').length,
+    updates: plan.entries.filter((e) => e.kind === 'update').length,
+    unchanged: plan.unchanged.length,
   };
 }
 
@@ -102,12 +114,16 @@ export interface RunSummary {
   candidates: number;
   /** Totals over sources that were deduped. */
   dedup: DedupCounts;
+  /** Totals over sources whose review items were written. */
+  queue: QueueCounts;
 }
 
 export interface RunAllOptions {
   store: SourceStore;
   /** When given, candidates are deduped against existing productions. */
   productions?: ProductionStore;
+  /** When given (with `productions`), new and update candidates are written to the review queue. */
+  reviewQueue?: ReviewQueueStore;
   adapters: Partial<Record<SourceKind, Adapter>>;
   /** Shared by all sources in the run (one polite fetch per run). */
   fetch: typeof fetch;
@@ -136,6 +152,12 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
   const queue = [...sources];
   const outcomes: SourceOutcome[] = [];
 
+  // Built on first use and shared by every source in the run.
+  let workIndex: Promise<WorkIndex> | undefined;
+  const loadWorkIndex = (store: ReviewQueueStore) =>
+    (workIndex ??= store.loadWorks().then(buildWorkIndex));
+  const emptyIndex = buildWorkIndex([]);
+
   async function runOne(source: StoredSource): Promise<SourceOutcome> {
     const started = Date.now();
     const prefix = `[${source.kind} ${source.id}]`;
@@ -161,13 +183,36 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
     const update = healthUpdate(source, result, runAt);
 
     let dedup: DedupCounts | undefined;
+    let queueCounts: QueueCounts | undefined;
     if (options.productions && result.ok && result.candidates.length > 0) {
+      let existing: DedupProduction[] | undefined;
       try {
-        const existing = await options.productions.loadForCompany(source.companyId);
-        // Writing new and update items to the review queue comes in #23.
-        dedup = countDedup(result.candidates.map((c) => dedupCandidate(c, existing, runAt)));
+        existing = await options.productions.loadForCompany(source.companyId);
       } catch (err) {
         log(`${prefix} could not load productions for dedup: ${errorMessage(err)}`);
+      }
+      if (existing) {
+        const reviewQueue = options.reviewQueue;
+        let index = emptyIndex;
+        let canWrite = !!reviewQueue;
+        if (reviewQueue) {
+          try {
+            index = await loadWorkIndex(reviewQueue);
+          } catch (err) {
+            canWrite = false;
+            log(`${prefix} could not load works for matching: ${errorMessage(err)}`);
+          }
+        }
+        const plan = planReviewItems(result.candidates, existing, index, runAt);
+        dedup = countDedup(plan);
+        if (plan.skipped > 0) log(`${prefix} skipped ${plan.skipped} candidate(s) without a title`);
+        if (reviewQueue && canWrite) {
+          try {
+            queueCounts = await reviewQueue.write(source, plan, runAt);
+          } catch (err) {
+            log(`${prefix} could not write review items: ${errorMessage(err)}`);
+          }
+        }
       }
     }
 
@@ -178,6 +223,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
       itemCount: result.itemCount,
       candidateCount: result.candidates.length,
       dedup,
+      queue: queueCounts,
       health: update.health,
       error: result.error,
       ms: Date.now() - started,
@@ -191,6 +237,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
       result.ok
         ? `${prefix} ok: ${result.itemCount} item(s), ${result.candidates.length} candidate(s)` +
             (dedup ? ` (${formatDedup(dedup)})` : '') +
+            (queueCounts ? `; queue: ${formatQueue(queueCounts)}` : '') +
             `, ${update.health}`
         : `${prefix} failed: ${result.error}`,
     );
@@ -219,11 +266,24 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
       updates: ran.reduce((sum, o) => sum + (o.dedup?.updates ?? 0), 0),
       unchanged: ran.reduce((sum, o) => sum + (o.dedup?.unchanged ?? 0), 0),
     },
+    queue: {
+      created: ran.reduce((sum, o) => sum + (o.queue?.created ?? 0), 0),
+      updated: ran.reduce((sum, o) => sum + (o.queue?.updated ?? 0), 0),
+      autoApproved: ran.reduce((sum, o) => sum + (o.queue?.autoApproved ?? 0), 0),
+      cleared: ran.reduce((sum, o) => sum + (o.queue?.cleared ?? 0), 0),
+    },
   };
 }
 
 function formatDedup(d: DedupCounts) {
   return `${d.new} new, ${d.updates} update(s), ${d.unchanged} unchanged`;
+}
+
+function formatQueue(q: QueueCounts) {
+  return (
+    `${q.created} created, ${q.updated} updated, ${q.autoApproved} auto-approved, ` +
+    `${q.cleared} cleared`
+  );
 }
 
 /** Plain-text summary for the Actions log. */
@@ -234,6 +294,10 @@ export function formatSummary(summary: RunSummary, ms: number): string {
       `${summary.items} item(s), ${summary.candidates} candidate(s)` +
       (summary.candidates > 0 ? ` (${formatDedup(summary.dedup)})` : ''),
   ];
+  const q = summary.queue;
+  if (q.created + q.updated + q.autoApproved + q.cleared > 0) {
+    lines.push(`  review queue: ${formatQueue(q)}`);
+  }
   for (const o of summary.outcomes.filter((o) => !o.ok)) {
     lines.push(`  FAILED ${o.kind} ${o.sourceId}: ${o.error}`);
   }

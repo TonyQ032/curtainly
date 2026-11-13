@@ -1,8 +1,8 @@
 /**
  * Entry point for the daily GitHub Actions run (`pnpm ingest`).
  * Loads enabled sources (or only INGEST_SOURCE_ID), runs each through its
- * adapter, dedups candidates against existing productions (#22) and records
- * health on the Source. Writing candidates to the review queue comes in #23.
+ * adapter, dedups candidates against existing productions (#22), writes new
+ * and update items to the review queue (#23) and records health on the Source.
  *
  * Exits 0 when individual sources fail: that is recorded as source health.
  * Exits 1 only when the run itself can't proceed (no database, unknown source).
@@ -12,6 +12,7 @@ import { createDb } from '@curtainly/shared/db';
 import { adapters } from './adapters';
 import { createPoliteFetch } from './polite-fetch';
 import { dbProductionStore } from './production-store';
+import { dbReviewQueue } from './review-store';
 import { formatSummary, runAll } from './run';
 import { dbSourceStore } from './source-store';
 
@@ -37,6 +38,7 @@ try {
   const summary = await runAll({
     store: dbSourceStore(db),
     productions: dbProductionStore(db),
+    reviewQueue: dbReviewQueue(db),
     adapters,
     fetch: createPoliteFetch({ log: (m) => console.log(`[fetch] ${m}`) }),
     sourceId,

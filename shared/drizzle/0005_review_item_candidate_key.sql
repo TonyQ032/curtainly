@@ -1,0 +1,2 @@
+ALTER TABLE "review_items" ADD COLUMN "candidate_key" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "review_items_pending_candidate_uq" ON "review_items" USING btree ("source_id","candidate_key") WHERE "review_items"."status" = 'pending';

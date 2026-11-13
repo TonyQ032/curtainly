@@ -36,6 +36,13 @@
       "when": 1794504095520,
       "tag": "0004_review_item_diff",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794601167829,
+      "tag": "0005_review_item_candidate_key",
+      "breakpoints": true
     }
   ]
 }

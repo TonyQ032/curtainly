@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./db": "./src/db/index.ts",
     "./db/schema": "./src/db/schema.ts",
+    "./db/apply-diff": "./src/db/apply-diff.ts",
     "./geocode": "./src/geocode.ts"
   },
   "scripts": {
