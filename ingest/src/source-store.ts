@@ -17,6 +17,7 @@ export function dbSourceStore(db: Db): SourceStore {
           kind: sources.kind,
           config: sources.config,
           enabled: sources.enabled,
+          autoApprove: sources.autoApprove,
           lastItemsAt: sources.lastItemsAt,
         })
         .from(sources)

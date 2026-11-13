@@ -37,6 +37,7 @@ import {
   WORK_TYPES,
 } from '../enums';
 import type { ProductionDiff } from '../production-diff';
+import type { WorkMatch } from '../work-match';
 
 export const tierEnum = pgEnum('tier', TIERS);
 export const workTypeEnum = pgEnum('work_type', WORK_TYPES);
@@ -216,21 +217,29 @@ export const reviewItems = pgTable(
     sourceId: uuid('source_id').references(() => sources.id),
     /** Existing production this item would update, if any. */
     productionId: uuid('production_id').references(() => productions.id),
+    /**
+     * Identity of an ingested candidate within its source (`external:<id>` or
+     * `title:<normalized title>`). At most one pending item per source and key,
+     * so reruns update the item instead of queueing a duplicate.
+     */
+    candidateKey: text('candidate_key'),
     payload: jsonb('payload').notNull(),
     proposed: jsonb('proposed').notNull(),
     /** For updates (`production_id` set): what re-ingesting would change. Null for new items. */
     diff: jsonb('diff').$type<ProductionDiff>(),
-    matchSuggestions: jsonb('match_suggestions')
-      .$type<{ workId: string; title: string; score: number }[]>()
-      .notNull()
-      .default([]),
+    matchSuggestions: jsonb('match_suggestions').$type<WorkMatch[]>().notNull().default([]),
     status: reviewStatusEnum('status').notNull().default('pending'),
     rejectReason: text('reject_reason'),
     reviewer: text('reviewer'),
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index('review_items_status_idx').on(t.status, t.createdAt)],
+  (t) => [
+    index('review_items_status_idx').on(t.status, t.createdAt),
+    uniqueIndex('review_items_pending_candidate_uq')
+      .on(t.sourceId, t.candidateKey)
+      .where(sql`${t.status} = 'pending'`),
+  ],
 ).enableRLS();
 
 export const leads = pgTable('leads', {

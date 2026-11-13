@@ -2,6 +2,20 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-13: Writing candidates to the review queue (#23)
+
+**One pending item per source and candidate key.** `review_items.candidate_key` is the upstream id (`external:<id>`) or, without one, the normalized title (`title:<…>`). A partial unique index on `(source_id, candidate_key) where status = 'pending'` lets reruns upsert: the pending item is rewritten only when what the reviewer sees changed (proposed production, diff, linked production, Work suggestions). A raw-payload-only change, such as seats left, doesn't touch it. A key-based item also moves from "new" to "update" in place if the production gets created by other means.
+
+**Candidates that point at the same production are merged before diffing**, and so are candidates sharing a key. Platforms often list a run as one event per week or per performance; diffed one by one, each piece would propose removing the others' performances. The merged item keeps every raw item in `payload` (always an array).
+
+**Stale items are cleared.** When a candidate now matches its production with nothing to change (the production was edited to match, or the source reverted), that source's pending items for the key or production are deleted. Items are never cleared just because a candidate is missing from a run, since a bad scrape would empty the queue.
+
+**Auto-approve publishes updates only.** For a source with `auto_approve`, an update's diff is applied directly (`applyProductionDiff` in `@curtainly/shared/db/apply-diff`, which #25 reuses for manual approval) and logged as an `approved` ReviewItem with reviewer `auto-approve`. New productions still go to the queue, because they need a Work and a venue picked by a person. This follows the plan ("its updates then publish directly"); #27 adds when a source earns the flag.
+
+**Work suggestions are stored for new items only** (`match_suggestions`, now the full `WorkMatch` with `kind` and `matchedTitle`); an update's Work is already known. Works are loaded once per run.
+
+**Open for #25:** a rejected item doesn't stop the same candidate from being queued again on the next run. Whether rejection should suppress a key (and for how long) is decided with the review actions and the "not a show" rule (#26).
+
 ## 2026-11-12: Dedup and update diffs (#22)
 
 **Same Work means the candidate's normalized title equals the Work's normalized title or one of its alt titles**, not a fuzzy match. Dedup runs unattended, so a fuzzy hit could silently merge two different shows; anything less than an exact match becomes a new item, and the reviewer sees the fuzzy Work suggestions there. Dates overlap when the candidate's first-to-last performance (as local dates in the venue Region's timezone) shares a day with the production's run. If several productions match, the one sharing the most days wins. A candidate with no performances never matches.

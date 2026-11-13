@@ -8,6 +8,7 @@ import {
   type StoredSource,
 } from './run';
 import type { DedupProduction } from '@curtainly/shared';
+import type { ReviewPlan, ReviewQueueStore } from './review-queue';
 import type { Adapter } from './types';
 
 const now = new Date('2027-01-10T12:00:00Z');
@@ -20,6 +21,7 @@ function source(id: string, overrides: Partial<StoredSource> = {}): StoredSource
     kind: 'jsonld',
     config: {},
     enabled: true,
+    autoApprove: false,
     lastItemsAt: null,
     ...overrides,
   };
@@ -166,39 +168,55 @@ describe('runAll', () => {
     expect(logs.some((l) => l.includes('could not record health: db down'))).toBe(true);
   });
 
+  const existing: DedupProduction = {
+    id: 'p1',
+    companyId: 'c1',
+    workId: 'w1',
+    workNormalizedTitle: 'into the woods',
+    workAltTitles: [],
+    startDate: '2027-01-15',
+    endDate: '2027-01-31',
+    timeZone: 'America/Los_Angeles',
+    priceMin: '25.00',
+    priceMax: null,
+    ticketUrl: null,
+    advisory: null,
+    runtimeMin: null,
+    performances: [new Date('2027-01-16T03:30:00Z')],
+  };
+  const perf = [{ startsAt: '2027-01-15T19:30:00-08:00' }];
+  const company: DedupProduction = { ...existing, id: 'p2', workNormalizedTitle: 'company' };
+
+  /** One unchanged (Into the Woods), one update (Company, new price), one new (Assassins). */
+  const mixedAdapter: Adapter = {
+    kind: 'jsonld',
+    fetch: async () => [{ data: 0 }],
+    normalize: (raw, src) => [
+      { title: 'Into the Woods', companyId: src.companyId, performances: perf, raw },
+      { title: 'Company', companyId: src.companyId, performances: perf, priceMin: 20, raw },
+      { title: 'Assassins', companyId: src.companyId, performances: perf, raw },
+    ],
+  };
+
+  function memoryQueue(opts: { failWorks?: boolean; failWrite?: boolean } = {}) {
+    const writes: { source: { id: string; autoApprove: boolean }; plan: ReviewPlan }[] = [];
+    let worksLoads = 0;
+    const queue: ReviewQueueStore = {
+      async loadWorks() {
+        worksLoads++;
+        if (opts.failWorks) throw new Error('works down');
+        return [{ id: 'w9', title: 'Assassins', normalizedTitle: 'assassins', altTitles: [] }];
+      },
+      async write(source, plan) {
+        if (opts.failWrite) throw new Error('queue down');
+        writes.push({ source: { id: source.id, autoApprove: source.autoApprove }, plan });
+        return { created: 2, updated: 0, autoApproved: 0, cleared: 1 };
+      },
+    };
+    return { queue, writes, worksLoads: () => worksLoads };
+  }
+
   it('dedups candidates against existing productions', async () => {
-    const existing: DedupProduction = {
-      id: 'p1',
-      companyId: 'c1',
-      workId: 'w1',
-      workNormalizedTitle: 'into the woods',
-      workAltTitles: [],
-      startDate: '2027-01-15',
-      endDate: '2027-01-31',
-      timeZone: 'America/Los_Angeles',
-      priceMin: '25.00',
-      priceMax: null,
-      ticketUrl: null,
-      advisory: null,
-      runtimeMin: null,
-      performances: [new Date('2027-01-16T03:30:00Z')],
-    };
-    const perf = [{ startsAt: '2027-01-15T19:30:00-08:00' }];
-    const adapter: Adapter = {
-      kind: 'jsonld',
-      fetch: async () => [{ data: 0 }],
-      normalize: (raw, src) => [
-        { title: 'Into the Woods', companyId: src.companyId, performances: perf, raw },
-        {
-          title: 'Into the Woods',
-          companyId: src.companyId,
-          performances: perf,
-          priceMin: 20,
-          raw,
-        },
-        { title: 'Company', companyId: src.companyId, performances: perf, raw },
-      ],
-    };
     const { store } = memoryStore([source('a')]);
     const loaded: string[] = [];
     const logs: string[] = [];
@@ -207,10 +225,10 @@ describe('runAll', () => {
       productions: {
         async loadForCompany(companyId) {
           loaded.push(companyId);
-          return [existing];
+          return [existing, company];
         },
       },
-      adapters: { jsonld: adapter },
+      adapters: { jsonld: mixedAdapter },
       fetch,
       log: (m) => logs.push(m),
       now: () => now,
@@ -218,10 +236,82 @@ describe('runAll', () => {
     expect(loaded).toEqual(['c1']);
     expect(summary.dedup).toEqual({ new: 1, updates: 1, unchanged: 1 });
     expect(summary.outcomes[0]?.dedup).toEqual({ new: 1, updates: 1, unchanged: 1 });
+    expect(summary.outcomes[0]?.queue).toBeUndefined();
     expect(logs.some((l) => l.includes('3 candidate(s) (1 new, 1 update(s), 1 unchanged)'))).toBe(
       true,
     );
     expect(formatSummary(summary, 100)).toContain('(1 new, 1 update(s), 1 unchanged)');
+  });
+
+  it("writes each source's plan to the review queue, loading works once", async () => {
+    const { store } = memoryStore([source('a'), source('b', { autoApprove: true })]);
+    const { queue, writes, worksLoads } = memoryQueue();
+    const logs: string[] = [];
+    const summary = await runAll({
+      store,
+      productions: { loadForCompany: async () => [existing, company] },
+      reviewQueue: queue,
+      adapters: { jsonld: mixedAdapter },
+      fetch,
+      log: (m) => logs.push(m),
+      now: () => now,
+    });
+    expect(worksLoads()).toBe(1);
+    expect(writes.map((w) => w.source)).toEqual(
+      expect.arrayContaining([
+        { id: 'a', autoApprove: false },
+        { id: 'b', autoApprove: true },
+      ]),
+    );
+    const plan = writes[0]!.plan;
+    expect(plan.entries.map((e) => [e.kind, e.key, e.productionId])).toEqual([
+      ['update', 'title:company', 'p2'],
+      ['new', 'title:assassins', null],
+    ]);
+    expect(plan.entries[1]?.matchSuggestions[0]).toMatchObject({ workId: 'w9', kind: 'exact' });
+    expect(plan.unchanged).toEqual([{ key: 'title:into the woods', productionId: 'p1' }]);
+    expect(summary.queue).toEqual({ created: 4, updated: 0, autoApproved: 0, cleared: 2 });
+    expect(logs.some((l) => l.includes('queue: 2 created, 0 updated, 0 auto-approved'))).toBe(true);
+    expect(formatSummary(summary, 100)).toContain('review queue: 4 created');
+  });
+
+  it('skips queue writes when works fail to load, but still counts dedup', async () => {
+    const { store, writes: health } = memoryStore([source('a')]);
+    const { queue, writes } = memoryQueue({ failWorks: true });
+    const logs: string[] = [];
+    const summary = await runAll({
+      store,
+      productions: { loadForCompany: async () => [existing, company] },
+      reviewQueue: queue,
+      adapters: { jsonld: mixedAdapter },
+      fetch,
+      log: (m) => logs.push(m),
+      now: () => now,
+    });
+    expect(writes).toEqual([]);
+    expect(summary.outcomes[0]?.dedup).toEqual({ new: 1, updates: 1, unchanged: 1 });
+    expect(health.get('a')).toMatchObject({ health: 'healthy' });
+    expect(logs.some((l) => l.includes('could not load works for matching: works down'))).toBe(
+      true,
+    );
+  });
+
+  it('records health when the queue write fails', async () => {
+    const { store, writes: health } = memoryStore([source('a')]);
+    const { queue } = memoryQueue({ failWrite: true });
+    const logs: string[] = [];
+    const summary = await runAll({
+      store,
+      productions: { loadForCompany: async () => [] },
+      reviewQueue: queue,
+      adapters: { jsonld: mixedAdapter },
+      fetch,
+      log: (m) => logs.push(m),
+      now: () => now,
+    });
+    expect(summary.outcomes[0]?.queue).toBeUndefined();
+    expect(health.get('a')).toMatchObject({ health: 'healthy' });
+    expect(logs.some((l) => l.includes('could not write review items: queue down'))).toBe(true);
   });
 
   it('still records health when productions fail to load', async () => {
