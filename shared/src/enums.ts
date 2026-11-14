@@ -49,8 +49,20 @@ export type SourceKind = (typeof SOURCE_KINDS)[number];
 export const SOURCE_HEALTH = ['unknown', 'healthy', 'unhealthy'] as const;
 export type SourceHealth = (typeof SOURCE_HEALTH)[number];
 
-export const REVIEW_STATUSES = ['pending', 'approved', 'rejected', 'merged'] as const;
+/**
+ * `not_a_show`: the source's item isn't a production (a gala, class, camp…).
+ * The runner never queues that candidate key from that source again.
+ */
+export const REVIEW_STATUSES = ['pending', 'approved', 'rejected', 'merged', 'not_a_show'] as const;
 export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
+
+export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  merged: 'Merged',
+  not_a_show: 'Not a show',
+};
 
 export const LEAD_ORIGINS = ['mti', 'trw', 'report'] as const;
 export type LeadOrigin = (typeof LEAD_ORIGINS)[number];

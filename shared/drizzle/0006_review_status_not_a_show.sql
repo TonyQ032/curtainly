@@ -1,0 +1,1 @@
+ALTER TYPE "public"."review_status" ADD VALUE 'not_a_show';

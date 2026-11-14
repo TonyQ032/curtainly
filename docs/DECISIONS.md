@@ -2,6 +2,22 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-13: Review item detail and actions (#25)
+
+**Detail page at `/admin/review/[id]`** shows the proposed production beside the raw payload, the diff for updates, and Work matches. Matches for pending new items are recomputed when the page loads, so a Work created while working through the queue shows up; reviewed items keep what was stored. Every action records the reviewer's email and time, and moves on to the next pending item.
+
+**Approve.** An update applies its stored diff (`applyProductionDiff`). A new item needs a Work (a suggestion, preselected when the title or an alt title matches, or a new Work with a type), a venue (preselected by name, else the company's latest venue) and publish or draft; publishing is refused for out-of-scope companies. A new Work whose normalized title already exists is refused, and so is a production overlapping one of the same company and Work, with a pointer to Merge.
+
+**Edit then approve reuses the production form**: `/admin/productions/new?review=<id>` or `/admin/productions/<id>?review=<id>` prefill it from the item (an update's diff applied to the current values), and saving approves the item in the same transaction.
+
+**Merge only adds.** Merging a new item into an existing production of the same company applies the diff against that production without removing performances, since a source listing is often partial. It marks the item `merged`.
+
+**The source's title is learned.** When approving or merging links a title to a Work under a different name, the title is added to the Work's alt titles, so the next run dedups to the production instead of queueing it as new again.
+
+**Rejected and "not a show" items stop re-queueing** (settles the open point from #23). The runner skips a candidate key that the source's reviewer marked `not_a_show` (a new `review_status` value), for good. A rejected proposal isn't queued again until what the source lists changes. Skipped entries are counted as `dismissed` in the run summary. Keyword rules for non-show events stay with #26.
+
+**Dates only widen.** `applyProductionDiff` now takes the earlier start and later end of the production and the diff, so a diff approved after the production changed can't shrink its run.
+
 ## 2026-11-13: Review queue list (#24)
 
 **"Type" is new or update**, derived from `review_items.production_id`; "Source" filters by source kind (Ticketmaster, JSON-LD, Public submission…). The list shows pending items only, newest first by `created_at`.

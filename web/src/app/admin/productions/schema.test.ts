@@ -50,6 +50,7 @@ describe('productionFormSchema', () => {
       workId: WORK,
       newWorkTitle: '',
       newWorkType: undefined,
+      reviewItemId: '',
       confirmNewWork: '',
       companyId: COMPANY,
       venueId: VENUE,

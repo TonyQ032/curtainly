@@ -1,6 +1,12 @@
 import { buildWorkIndex, type DedupProduction } from '@curtainly/shared';
 import { describe, expect, it } from 'vitest';
-import { candidateKey, mergeCandidates, planReviewItems } from './review-queue';
+import {
+  candidateKey,
+  dropDismissed,
+  mergeCandidates,
+  planReviewItems,
+  type QueueEntry,
+} from './review-queue';
 import type { CandidateProduction } from './types';
 
 const now = new Date('2027-01-10T12:00:00Z');
@@ -170,5 +176,58 @@ describe('planReviewItems', () => {
     expect(planReviewItems(input, [woods], works, now)).toEqual(
       planReviewItems(input, [woods], works, now),
     );
+  });
+});
+
+describe('dropDismissed', () => {
+  const entry = (key: string, proposed: Record<string, unknown>): QueueEntry => ({
+    key,
+    kind: 'new',
+    productionId: null,
+    payload: [],
+    proposed: proposed as QueueEntry['proposed'],
+    diff: null,
+    matchSuggestions: [],
+  });
+  const gala = entry('title:spring gala', {
+    title: 'Spring Gala',
+    companyId: 'c1',
+    performances: [],
+  });
+  const woodsEntry = entry('external:9', {
+    title: 'Into the Woods',
+    companyId: 'c1',
+    performances: [{ startsAt: FRI_15 }],
+    priceMin: 25,
+  });
+
+  it('drops keys marked not a show', () => {
+    const result = dropDismissed([gala, woodsEntry], {
+      notAShow: new Set(['title:spring gala']),
+      rejected: new Map(),
+    });
+    expect(result.entries).toEqual([woodsEntry]);
+    expect(result.dismissed).toBe(1);
+  });
+
+  it('drops a rejected proposal until it changes, whatever its key order', () => {
+    const rejected = new Map([
+      [
+        'external:9',
+        [
+          {
+            priceMin: 25,
+            performances: [{ startsAt: FRI_15 }],
+            companyId: 'c1',
+            title: 'Into the Woods',
+          },
+        ],
+      ],
+    ]);
+    expect(dropDismissed([woodsEntry], { notAShow: new Set(), rejected }).dismissed).toBe(1);
+
+    const changed = entry('external:9', { ...woodsEntry.proposed, priceMin: 30 });
+    const result = dropDismissed([changed], { notAShow: new Set(), rejected });
+    expect(result).toEqual({ entries: [changed], dismissed: 0 });
   });
 });

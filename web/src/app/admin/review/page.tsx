@@ -55,8 +55,11 @@ const columns: Column<Row>[] = [
   {
     key: 'title',
     header: 'Title',
-    // The detail page with approve / reject comes in #25.
-    cell: (r) => <strong>{proposedTitle(r.proposed)}</strong>,
+    cell: (r) => (
+      <strong>
+        <Link href={`/admin/review/${r.id}`}>{proposedTitle(r.proposed)}</Link>
+      </strong>
+    ),
   },
   {
     key: 'type',

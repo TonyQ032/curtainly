@@ -142,6 +142,12 @@ export const productionFormSchema = z
       .transform((v) => v === 'on' || v === 'true'),
     status: z.enum(PRODUCTION_STATUSES, { error: 'Pick a status' }),
     performances: performancesField.default([]),
+    /** "Edit then approve": the review item this save approves. */
+    reviewItemId: z
+      .string()
+      .trim()
+      .default('')
+      .refine((s) => s === '' || UUID_PATTERN.test(s), 'Unknown review item'),
   })
   .superRefine((p, ctx) => {
     const issue = (path: string, message: string) =>

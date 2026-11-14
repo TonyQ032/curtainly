@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { isUuid } from '@/lib/fields';
 import type { SearchParams } from '@/lib/list-params';
 import { PageHeader } from '../../_components/page-header';
+import { loadReviewItem, newProductionPrefill } from '../../review/review-data';
 import { createProduction } from '../actions';
 import { loadFormOptions } from '../options';
 import { ProductionForm } from '../production-form';
@@ -17,7 +18,10 @@ function one(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
 }
 
-/** `?work=<id>` and `?company=<id>` prefill the form (links from Work and Company pages). */
+/**
+ * `?work=<id>` and `?company=<id>` prefill the form (links from Work and Company
+ * pages); `?review=<id>` fills it from a new review item ("edit then approve").
+ */
 export default async function NewProductionPage({
   searchParams,
 }: {
@@ -27,8 +31,9 @@ export default async function NewProductionPage({
   const sp = await searchParams;
   const workParam = one(sp.work) ?? '';
   const companyParam = one(sp.company) ?? '';
+  const reviewParam = one(sp.review) ?? '';
 
-  const [options, [work]] = await Promise.all([
+  const [options, [work], review] = await Promise.all([
     loadFormOptions(),
     isUuid(workParam)
       ? db()
@@ -37,6 +42,9 @@ export default async function NewProductionPage({
           .where(eq(works.id, workParam))
           .limit(1)
       : Promise.resolve([]),
+    reviewParam
+      ? loadReviewItem(reviewParam).then((row) => (row ? newProductionPrefill(row) : undefined))
+      : Promise.resolve(undefined),
   ]);
 
   if (options.companies.length === 0 || options.venues.length === 0) {
@@ -62,8 +70,18 @@ export default async function NewProductionPage({
     <>
       <PageHeader
         title="New production"
-        description="For companies with no automatable source. One company's run of one work."
+        description={
+          review
+            ? 'Check the source’s values, fix what’s wrong, and save to approve.'
+            : "For companies with no automatable source. One company's run of one work."
+        }
       />
+      {reviewParam && !review && (
+        <p className="callout">
+          That review item isn’t pending any more, or isn’t a new production.{' '}
+          <Link href="/admin/review">Back to the queue</Link>
+        </p>
+      )}
       <ProductionForm
         action={createProduction}
         isNew
@@ -87,6 +105,7 @@ export default async function NewProductionPage({
           familyFriendly: '',
           status: 'draft',
           performances: '[]',
+          ...review,
         }}
       />
     </>

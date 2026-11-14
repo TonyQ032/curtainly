@@ -28,6 +28,8 @@ export type ProductionFormValues = {
   status: string;
   /** JSON array of PerformanceRow. */
   performances: string;
+  /** Set when editing a review item before approving it ("edit then approve"). */
+  reviewItemId?: string;
 };
 
 export type CompanyOption = {
@@ -103,7 +105,8 @@ function ProductionFormFields({
   isNew: boolean;
 }) {
   const echoed = state.values;
-  const v = (name: keyof ProductionFormValues) => echoed?.[name] ?? defaults[name];
+  const v = (name: Exclude<keyof ProductionFormValues, 'reviewItemId'>) =>
+    echoed?.[name] ?? defaults[name];
   const err = (name: string) => state.fieldErrors?.[name]?.join(' ');
 
   // Tracked so the performance editor knows the timezone and the run's dates.
@@ -123,6 +126,16 @@ function ProductionFormFields({
   return (
     <form action={formAction} className="stack form production-form">
       <FormMessage state={state} />
+      {defaults.reviewItemId && (
+        <>
+          <input type="hidden" name="reviewItemId" value={defaults.reviewItemId} />
+          <p className="callout">
+            Filled in from a{' '}
+            <Link href={`/admin/review/${defaults.reviewItemId}`}>review item</Link>. Saving
+            approves it.
+          </p>
+        </>
+      )}
       {state.overlapping && (
         <p className="callout">
           Existing production:{' '}
@@ -302,9 +315,19 @@ function ProductionFormFields({
 
       <div className="form-actions">
         <SubmitButton pendingText={isNew ? 'Creating…' : 'Saving…'}>
-          {isNew ? 'Create production' : 'Save changes'}
+          {defaults.reviewItemId
+            ? 'Save and approve'
+            : isNew
+              ? 'Create production'
+              : 'Save changes'}
         </SubmitButton>
-        <Link href="/admin/productions">Cancel</Link>
+        <Link
+          href={
+            defaults.reviewItemId ? `/admin/review/${defaults.reviewItemId}` : '/admin/productions'
+          }
+        >
+          Cancel
+        </Link>
       </div>
     </form>
   );
