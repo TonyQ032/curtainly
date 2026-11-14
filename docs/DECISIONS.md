@@ -2,6 +2,20 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-13: Non-show filter rules (#26)
+
+**A rule is a keyword or phrase matched as whole words in the candidate's title**, after `normalizeKeyword` (lowercase, accents and punctuation removed, `&` as "and"; unlike `normalizeTitle`, nothing is dropped). Rules live in `filter_rules`, global when `source_id` is null, unique per scope and keyword. Only the title is matched: it's the one text field every adapter provides, and we don't store descriptions.
+
+**Filtered candidates are dropped before dedup**, counted per source (`filtered` in the run outcome and summary) and logged with their titles and the matching keyword, so a rule that's too broad shows up in the Actions log. They never touch the queue. If rules fail to load, the run filters nothing; review still catches non-shows.
+
+**Global rules are seeded by the migration and kept conservative**: gala, fundraiser, audition(s), acting class(es), masterclass, summer/theatre/theater/drama camp, staged reading, play reading, reading series, improv, open mic, gift card, gift certificate, season subscription, flex pass, parking, donation. Single words that are also show titles ("Master Class", "Camp Rock", "Workshop") are left to per-source rules, because a false positive drops a real show without anyone seeing it in the queue.
+
+**"Not a show" can add a rule for the source.** The form proposes a keyword found in the title (from a list of common non-show words) and the reviewer can change or clear it; it must occur in the item's title and be at least 3 letters. A source rule repeating a global one isn't added. The key-based suppression from #25 still applies with or without a keyword.
+
+**Adding a rule closes the pending items it matches** (same source, or every source for a global rule) as `not_a_show`: the runner never sees filtered candidates again, so those items would otherwise stay pending forever. Removing a rule doesn't reopen anything.
+
+**`/admin/filter-rules`** lists rules (filter by scope, search by keyword), adds global or per-source rules, and removes them. It sits next to the review queue in the nav.
+
 ## 2026-11-13: Review item detail and actions (#25)
 
 **Detail page at `/admin/review/[id]`** shows the proposed production beside the raw payload, the diff for updates, and Work matches. Matches for pending new items are recomputed when the page loads, so a Work created while working through the queue shows up; reviewed items keep what was stored. Every action records the reviewer's email and time, and moves on to the next pending item.

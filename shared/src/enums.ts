@@ -46,6 +46,9 @@ export const SOURCE_KINDS = [
 ] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 
+/** Kinds that enter through the web app, never through an ingest adapter. */
+export const NON_ADAPTER_SOURCE_KINDS: readonly SourceKind[] = ['manual', 'submission'];
+
 export const SOURCE_HEALTH = ['unknown', 'healthy', 'unhealthy'] as const;
 export type SourceHealth = (typeof SOURCE_HEALTH)[number];
 

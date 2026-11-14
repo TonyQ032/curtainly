@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { WORK_TYPES, WORK_TYPE_LABELS, type WorkMatch } from '@curtainly/shared';
 import { initialFormState, type FormState } from '@/lib/forms';
-import { FormMessage, SubmitButton } from '../../_components/form';
+import { Field, FormMessage, SubmitButton } from '../../_components/form';
 import {
   approveReviewItem,
   markNotAShow,
@@ -29,6 +29,8 @@ export function ReviewActions(props: {
   editHref: string;
   canApprove: boolean;
   canMarkNotAShow: boolean;
+  /** Keyword proposed for a filter rule from the title, or ''. */
+  suggestedKeyword: string;
   proposedTitle: string;
   suggestions: WorkMatch[];
   preselectedWorkId: string;
@@ -60,7 +62,9 @@ export function ReviewActions(props: {
         <Merge id={props.id} productions={props.productions} />
       )}
       <Reject id={props.id} />
-      {props.canMarkNotAShow && <NotAShow id={props.id} />}
+      {props.canMarkNotAShow && (
+        <NotAShow id={props.id} suggestedKeyword={props.suggestedKeyword} />
+      )}
     </section>
   );
 }
@@ -296,16 +300,24 @@ function Reject({ id }: { id: string }) {
   );
 }
 
-function NotAShow({ id }: { id: string }) {
+function NotAShow({ id, suggestedKeyword }: { id: string; suggestedKeyword: string }) {
   const [state, action] = useActionState(markNotAShow.bind(null, id), initialFormState);
   return (
     <div className="review-action">
       <h3>Not a show</h3>
-      <form action={action} className="stack">
+      <form action={action} className="stack form">
         <FormMessage state={state} />
         <p className="muted">
           A gala, class, camp or audition. This source’s listing is never queued again.
         </p>
+        <Field
+          label="Also skip this source’s titles containing (optional)"
+          name="keyword"
+          state={state}
+          defaultValue={suggestedKeyword}
+          maxLength={100}
+          hint="Adds a filter rule: whole words, this source only. Its other pending items that match are closed too. Leave empty to skip only this listing."
+        />
         <div className="form-actions">
           <SubmitButton pendingText="Saving…">Mark not a show</SubmitButton>
         </div>

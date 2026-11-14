@@ -4,7 +4,12 @@ export type NavGroup = { label?: string; items: NavItem[] };
 
 export const NAV: NavGroup[] = [
   { items: [{ href: '/admin', label: 'Overview' }] },
-  { items: [{ href: '/admin/review', label: 'Review queue' }] },
+  {
+    items: [
+      { href: '/admin/review', label: 'Review queue' },
+      { href: '/admin/filter-rules', label: 'Filter rules' },
+    ],
+  },
   {
     label: 'Registry',
     items: [

@@ -1,6 +1,6 @@
 'use server';
 
-import { diffProduction, normalizeTitle } from '@curtainly/shared';
+import { diffProduction, normalizeTitle, titleHasKeyword } from '@curtainly/shared';
 import { applyProductionDiff } from '@curtainly/shared/db/apply-diff';
 import { performances, productions, venues, regions, works } from '@curtainly/shared/db/schema';
 import { and, eq, gte, lte } from 'drizzle-orm';
@@ -12,6 +12,8 @@ import { db } from '@/lib/db';
 import { fieldError, isUniqueViolation } from '@/lib/form-errors';
 import { parseForm, type FormState } from '@/lib/forms';
 import { generateSlug } from '@/lib/slugs';
+import { addFilterRule, closeMatchingPending } from '../filter-rules/rule-data';
+import { notAShowSchema } from '../filter-rules/schema';
 import {
   AlreadyReviewedError,
   closeReviewItem,
@@ -319,20 +321,43 @@ export async function rejectReviewItem(
   return next(id);
 }
 
-/** The source's item isn't a production; the runner won't queue this candidate key from it again. */
-export async function markNotAShow(id: string): Promise<FormState> {
+/**
+ * The source's item isn't a production; the runner won't queue this candidate
+ * key from it again. With a keyword, also adds a filter rule for the source
+ * (#26) and closes its other pending items the rule matches.
+ */
+export async function markNotAShow(
+  id: string,
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
   const { email } = await requireAdmin();
+  const parsed = parseForm(notAShowSchema, formData);
+  if (!parsed.ok) return parsed.state;
   const loaded = await pendingItem(id);
   if (!loaded.ok) return loaded.state;
-  if (!loaded.item.item.sourceId || !loaded.item.item.candidateKey) {
+  const { sourceId, candidateKey } = loaded.item.item;
+  if (!sourceId || !candidateKey) {
     return {
       status: 'error',
       message: 'Only items from a source can be marked “not a show”. Reject it instead.',
     };
   }
-  const failed = await inTransaction((tx) =>
-    closeReviewItem(tx, id, { status: 'not_a_show', reviewer: email }),
-  );
+  const { keyword } = parsed.data;
+  const title = loaded.item.proposed?.title ?? '';
+  if (keyword && !titleHasKeyword(title, keyword)) {
+    return fieldError(formData, {
+      keyword: [`“${keyword}” isn’t in this title. Use words from “${title}”.`],
+    });
+  }
+  const failed = await inTransaction(async (tx) => {
+    await closeReviewItem(tx, id, { status: 'not_a_show', reviewer: email });
+    if (keyword) {
+      await addFilterRule(tx, { sourceId, keyword, createdBy: email, reviewItemId: id });
+      await closeMatchingPending(tx, { sourceId, keyword }, email);
+    }
+  });
   if (failed) return failed;
+  if (keyword) revalidatePath('/admin/filter-rules');
   return next(id);
 }
