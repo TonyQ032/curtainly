@@ -5,6 +5,7 @@ import { desc, eq } from 'drizzle-orm';
 import {
   PRODUCTION_STATUS_LABELS,
   REVIEW_STATUS_LABELS,
+  suggestKeyword,
   utcToZoned,
   type ProductionDiff,
 } from '@curtainly/shared';
@@ -346,6 +347,7 @@ export default async function ReviewItemPage({ params }: Props) {
           }
           canApprove={isUpdate ? !!item.diff : !!proposed && !!company}
           canMarkNotAShow={!!item.sourceId && !!item.candidateKey}
+          suggestedKeyword={suggestKeyword(proposed?.title ?? '')}
           proposedTitle={proposed?.title ?? ''}
           suggestions={suggestions}
           preselectedWorkId={preselectedWork(suggestions)?.workId ?? ''}

@@ -21,6 +21,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -240,6 +241,29 @@ export const reviewItems = pgTable(
       .on(t.sourceId, t.candidateKey)
       .where(sql`${t.status} = 'pending'`),
   ],
+).enableRLS();
+
+/**
+ * Non-show event filter rules (#26): a candidate whose title contains
+ * `keyword` as whole words is counted but not queued. Global when `source_id`
+ * is null. See `findFilterRule` in `@curtainly/shared`.
+ */
+export const filterRules = pgTable(
+  'filter_rules',
+  {
+    id: id(),
+    sourceId: uuid('source_id').references(() => sources.id, { onDelete: 'cascade' }),
+    /** Normalized with `normalizeKeyword`. */
+    keyword: text('keyword').notNull(),
+    /** Admin email, or null for rules seeded by a migration. */
+    createdBy: text('created_by'),
+    /** The review item that was marked "not a show" when this rule was added. */
+    reviewItemId: uuid('review_item_id').references(() => reviewItems.id, {
+      onDelete: 'set null',
+    }),
+    ...timestamps,
+  },
+  (t) => [unique('filter_rules_source_keyword_uq').on(t.sourceId, t.keyword).nullsNotDistinct()],
 ).enableRLS();
 
 export const leads = pgTable('leads', {

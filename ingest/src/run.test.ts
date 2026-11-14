@@ -342,6 +342,81 @@ describe('runAll', () => {
     );
   });
 
+  it('drops candidates matching a global or source rule before dedup, loading rules once', async () => {
+    const { store } = memoryStore([source('a'), source('b')]);
+    const { queue, writes } = memoryQueue();
+    let ruleLoads = 0;
+    const logs: string[] = [];
+    const adapter: Adapter = {
+      kind: 'jsonld',
+      fetch: async () => [{ data: 0 }],
+      normalize: (raw, src) =>
+        ['Assassins', 'Spring Gala', 'Spring Gala', 'Kids Camp'].map((title) => ({
+          title,
+          companyId: src.companyId,
+          performances: perf,
+          raw,
+        })),
+    };
+    const summary = await runAll({
+      store,
+      productions: { loadForCompany: async () => [] },
+      reviewQueue: queue,
+      filterRules: {
+        async loadRules() {
+          ruleLoads++;
+          return [
+            { id: 'g', sourceId: null, keyword: 'gala' },
+            { id: 's', sourceId: 'a', keyword: 'camp' },
+          ];
+        },
+      },
+      adapters: { jsonld: adapter },
+      fetch,
+      log: (m) => logs.push(m),
+      now: () => now,
+    });
+    expect(ruleLoads).toBe(1);
+    const byId = Object.fromEntries(summary.outcomes.map((o) => [o.sourceId, o]));
+    expect(byId.a).toMatchObject({ candidateCount: 4, filtered: 3, dedup: { new: 1 } });
+    expect(byId.b).toMatchObject({ candidateCount: 4, filtered: 2, dedup: { new: 2 } });
+    expect(summary.filtered).toBe(5);
+    const keys = (id: string) =>
+      writes.find((w) => w.source.id === id)!.plan.entries.map((e) => e.key);
+    expect(keys('a')).toEqual(['title:assassins']);
+    expect(keys('b')).toEqual(['title:assassins', 'title:kids camp']);
+    expect(
+      logs.some((l) =>
+        l.includes(
+          '[jsonld a] filtered 3 non-show candidate(s): "Spring Gala" (gala), "Kids Camp" (camp)',
+        ),
+      ),
+    ).toBe(true);
+    expect(formatSummary(summary, 100)).toContain('8 candidate(s), 5 filtered as non-shows');
+  });
+
+  it('filters nothing when rules fail to load', async () => {
+    const { store } = memoryStore([source('a')]);
+    const logs: string[] = [];
+    const summary = await runAll({
+      store,
+      productions: { loadForCompany: async () => [] },
+      filterRules: {
+        async loadRules() {
+          throw new Error('rules down');
+        },
+      },
+      adapters: { jsonld: mixedAdapter },
+      fetch,
+      log: (m) => logs.push(m),
+      now: () => now,
+    });
+    expect(summary.outcomes[0]).toMatchObject({ filtered: 0, dedup: { new: 3 } });
+    expect(logs.some((l) => l.includes('could not load filter rules, filtering nothing'))).toBe(
+      true,
+    );
+  });
+
   it('respects the concurrency limit', async () => {
     let active = 0;
     let peak = 0;

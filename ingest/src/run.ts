@@ -5,11 +5,14 @@
  */
 import {
   buildWorkIndex,
+  NON_ADAPTER_SOURCE_KINDS,
   type DedupProduction,
   type SourceHealth,
   type SourceKind,
   type WorkIndex,
 } from '@curtainly/shared';
+import type { FilterRule } from '@curtainly/shared';
+import { describeFiltered, filterCandidates, type FilterRuleStore } from './filter';
 import {
   planReviewItems,
   type QueueCounts,
@@ -20,7 +23,7 @@ import { isUnhealthy, runSource } from './runner';
 import type { Adapter, AdapterContext, SourceRef, SourceRunResult } from './types';
 
 /** Kinds that enter through the web app, never through an adapter. */
-export const NON_ADAPTER_KINDS: readonly SourceKind[] = ['manual', 'submission'];
+export const NON_ADAPTER_KINDS = NON_ADAPTER_SOURCE_KINDS;
 
 /** A Source row as the runner sees it: the adapter's view plus the health fields. */
 export interface StoredSource extends SourceRef {
@@ -80,6 +83,8 @@ export interface SourceOutcome {
   ok: boolean;
   itemCount: number;
   candidateCount: number;
+  /** Candidates dropped by a non-show filter rule (#26): counted, never queued. */
+  filtered: number;
   /** Dedup counts, present when a ProductionStore was given and loading succeeded. */
   dedup?: DedupCounts;
   /** Review-queue writes, present when a ReviewQueueStore was given and writing succeeded. */
@@ -112,6 +117,8 @@ export interface RunSummary {
   unhealthy: number;
   items: number;
   candidates: number;
+  /** Candidates dropped by non-show filter rules. */
+  filtered: number;
   /** Totals over sources that were deduped. */
   dedup: DedupCounts;
   /** Totals over sources whose review items were written. */
@@ -124,6 +131,8 @@ export interface RunAllOptions {
   productions?: ProductionStore;
   /** When given (with `productions`), new and update candidates are written to the review queue. */
   reviewQueue?: ReviewQueueStore;
+  /** When given, candidates matching a non-show rule are counted and dropped before dedup. */
+  filterRules?: FilterRuleStore;
   adapters: Partial<Record<SourceKind, Adapter>>;
   /** Shared by all sources in the run (one polite fetch per run). */
   fetch: typeof fetch;
@@ -158,6 +167,14 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
     (workIndex ??= store.loadWorks().then(buildWorkIndex));
   const emptyIndex = buildWorkIndex([]);
 
+  // Loaded once per run. Without rules nothing is filtered: review still catches non-shows.
+  let rules: Promise<FilterRule[]> | undefined;
+  const loadRules = (store: FilterRuleStore) =>
+    (rules ??= store.loadRules().catch((err: unknown) => {
+      log(`[ingest] could not load filter rules, filtering nothing: ${errorMessage(err)}`);
+      return [];
+    }));
+
   async function runOne(source: StoredSource): Promise<SourceOutcome> {
     const started = Date.now();
     const prefix = `[${source.kind} ${source.id}]`;
@@ -169,6 +186,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
         ok: true,
         itemCount: 0,
         candidateCount: 0,
+        filtered: 0,
         ms: 0,
       };
     }
@@ -182,9 +200,22 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
     const runAt = now();
     const update = healthUpdate(source, result, runAt);
 
+    let candidates = result.candidates;
+    let filtered = 0;
+    if (options.filterRules && candidates.length > 0) {
+      const split = filterCandidates(candidates, source.id, await loadRules(options.filterRules));
+      candidates = split.kept;
+      filtered = split.filtered.length;
+      if (filtered > 0) {
+        log(
+          `${prefix} filtered ${filtered} non-show candidate(s): ${describeFiltered(split.filtered)}`,
+        );
+      }
+    }
+
     let dedup: DedupCounts | undefined;
     let queueCounts: QueueCounts | undefined;
-    if (options.productions && result.ok && result.candidates.length > 0) {
+    if (options.productions && result.ok && candidates.length > 0) {
       let existing: DedupProduction[] | undefined;
       try {
         existing = await options.productions.loadForCompany(source.companyId);
@@ -203,7 +234,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
             log(`${prefix} could not load works for matching: ${errorMessage(err)}`);
           }
         }
-        const plan = planReviewItems(result.candidates, existing, index, runAt);
+        const plan = planReviewItems(candidates, existing, index, runAt);
         dedup = countDedup(plan);
         if (plan.skipped > 0) log(`${prefix} skipped ${plan.skipped} candidate(s) without a title`);
         if (reviewQueue && canWrite) {
@@ -222,6 +253,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
       ok: result.ok,
       itemCount: result.itemCount,
       candidateCount: result.candidates.length,
+      filtered,
       dedup,
       queue: queueCounts,
       health: update.health,
@@ -236,6 +268,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
     log(
       result.ok
         ? `${prefix} ok: ${result.itemCount} item(s), ${result.candidates.length} candidate(s)` +
+            (filtered > 0 ? `, ${filtered} filtered` : '') +
             (dedup ? ` (${formatDedup(dedup)})` : '') +
             (queueCounts ? `; queue: ${formatQueue(queueCounts)}` : '') +
             `, ${update.health}`
@@ -261,6 +294,7 @@ export async function runAll(options: RunAllOptions): Promise<RunSummary> {
     unhealthy: ran.filter((o) => o.health === 'unhealthy').length,
     items: ran.reduce((sum, o) => sum + o.itemCount, 0),
     candidates: ran.reduce((sum, o) => sum + o.candidateCount, 0),
+    filtered: ran.reduce((sum, o) => sum + o.filtered, 0),
     dedup: {
       new: ran.reduce((sum, o) => sum + (o.dedup?.new ?? 0), 0),
       updates: ran.reduce((sum, o) => sum + (o.dedup?.updates ?? 0), 0),
@@ -293,6 +327,7 @@ export function formatSummary(summary: RunSummary, ms: number): string {
     `[ingest] ${summary.outcomes.length} source(s) in ${(ms / 1000).toFixed(1)}s: ` +
       `${summary.ok} ok, ${summary.failed} failed, ${summary.unhealthy} unhealthy; ` +
       `${summary.items} item(s), ${summary.candidates} candidate(s)` +
+      (summary.filtered > 0 ? `, ${summary.filtered} filtered as non-shows` : '') +
       (summary.candidates > 0 ? ` (${formatDedup(summary.dedup)})` : ''),
   ];
   const q = summary.queue;
