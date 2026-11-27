@@ -2,6 +2,14 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-26: Archiving ended productions (#28)
+
+**A published production is archived from local midnight after its end date**, in the timezone of its venue's Region (`regions.timezone`). `end_date` is already a local date, so the rule is `end_date < today in the Region`; the last day of a run is never archived, even when it is already the next day in UTC. It runs as `pnpm archive`, a step after ingest in the daily workflow (11:00 UTC, about 3–4 AM in San Diego), and it runs even when ingest fails. Each Region gets its own "today", and a failing Region doesn't stop the others but fails the step.
+
+**Only `published` productions are archived.** Drafts stay drafts so they aren't lost from the admin's working list, and `cancelled` keeps saying why the run didn't happen. Archiving is a fixed rule from the plan, not ingested data, so it doesn't go through the review queue; the step logs each archived production in the Actions log. If an archived run is extended, the admin sets it back to published by hand.
+
+**Archived productions are hidden from browse but listed on company, venue and work pages** (as past productions). Those public pages come in M4, which must apply this rule: browse queries filter on `status = 'published'`, while the archive sections on company, venue and work pages include `archived`.
+
 ## 2026-11-26: Auto-approval rule (#29, #27)
 
 **A source is eligible once its last 10 reviewed items in a row were approved without edits, ingested over at least 14 days** (`autoApproveEligibility` in `@curtainly/shared`). This replaces the plan's "about 10 consecutive clean runs": a daily run with nothing new is trivially clean, so we count reviewed items instead, and the 14-day span keeps one busy day from earning the flag.
