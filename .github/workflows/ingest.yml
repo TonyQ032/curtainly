@@ -32,3 +32,8 @@ jobs:
           TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
           INGEST_USER_AGENT: CurtainlyBot/0.1 (+https://github.com/${{ github.repository }})
           INGEST_SOURCE_ID: ${{ inputs.source }}
+      # Runs even when ingest fails, so ended productions are still archived.
+      - run: pnpm archive
+        if: ${{ !cancelled() }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

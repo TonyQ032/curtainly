@@ -16,6 +16,7 @@
     "db:generate": "pnpm --filter @curtainly/shared db:generate",
     "db:migrate": "pnpm --filter @curtainly/shared db:migrate",
     "ingest": "pnpm --filter @curtainly/ingest start",
+    "archive": "pnpm --filter @curtainly/ingest archive",
     "db:seed": "pnpm --filter @curtainly/shared db:seed"
   },
   "devDependencies": {
