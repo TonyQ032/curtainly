@@ -232,6 +232,8 @@ export const reviewItems = pgTable(
     status: reviewStatusEnum('status').notNull().default('pending'),
     rejectReason: text('reject_reason'),
     reviewer: text('reviewer'),
+    /** Approved via "edit then approve": breaks the source's auto-approve streak (#27). */
+    edited: boolean('edited').notNull().default(false),
     reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
     ...timestamps,
   },

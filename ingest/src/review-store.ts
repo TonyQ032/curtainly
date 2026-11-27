@@ -1,3 +1,4 @@
+import { AUTO_REVIEWER } from '@curtainly/shared';
 import { applyProductionDiff, type DbExecutor } from '@curtainly/shared/db/apply-diff';
 import type { Db } from '@curtainly/shared/db';
 import { reviewItems, works } from '@curtainly/shared/db/schema';
@@ -9,9 +10,6 @@ import {
   type QueueEntry,
   type ReviewQueueStore,
 } from './review-queue';
-
-/** `review_items.reviewer` for updates published by an auto-approve source. */
-export const AUTO_REVIEWER = 'auto-approve';
 
 const isPending = sql`${reviewItems.status} = 'pending'`;
 
