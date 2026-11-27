@@ -319,7 +319,14 @@ async function approveReview(
 ) {
   if (!review) return;
   if (review.title) await learnAltTitle(tx, workId, review.title);
-  await closeReviewItem(tx, review.id, { status: 'approved', reviewer, productionId });
+  // Going through the form counts as an edit for the source's auto-approve
+  // streak, even if nothing was changed: only "Approve" is a clean approval.
+  await closeReviewItem(tx, review.id, {
+    status: 'approved',
+    reviewer,
+    productionId,
+    edited: true,
+  });
 }
 
 async function finish(slug: string, review: Review | undefined): Promise<never> {

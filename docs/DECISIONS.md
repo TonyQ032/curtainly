@@ -2,6 +2,14 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-26: Auto-approval rule (#29, #27)
+
+**A source is eligible once its last 10 reviewed items in a row were approved without edits, ingested over at least 14 days** (`autoApproveEligibility` in `@curtainly/shared`). This replaces the plan's "about 10 consecutive clean runs": a daily run with nothing new is trivially clean, so we count reviewed items instead, and the 14-day span keeps one busy day from earning the flag.
+
+**Edit then approve, reject and merge break the streak; "not a show" and auto-approved updates are neutral.** Non-shows are the filter rules' job (#26), not a sign the source's data is wrong, and an auto-approved update was never checked by a person. Going through the edit form counts as an edit even when nothing was changed, so only the plain Approve action is clean. This is recorded in a new `review_items.edited` column; items approved before it existed count as clean.
+
+**The owner turns the flag on by hand, and only when the source is eligible.** The source page shows the streak, and the list marks eligible sources; the server refuses to turn the flag on otherwise (new sources included). Turning it off, or leaving it on after the streak breaks, is always allowed. A broken streak on an auto-approve source is shown on its page but doesn't switch the flag off by itself.
+
 ## 2026-11-13: Non-show filter rules (#26)
 
 **A rule is a keyword or phrase matched as whole words in the candidate's title**, after `normalizeKeyword` (lowercase, accents and punctuation removed, `&` as "and"; unlike `normalizeTitle`, nothing is dropped). Rules live in `filter_rules`, global when `source_id` is null, unique per scope and keyword. Only the title is matched: it's the one text field every adapter provides, and we don't store descriptions.
@@ -194,7 +202,6 @@ Tracked as issues with the `decision` label:
 - Final product name and domain (before public sharing)
 - Geocoding provider (Nominatim vs Mapbox free tier)
 - Map library for the map toggle (e.g. MapLibre + free tiles)
-- Auto-approval rule: count of reviewed items approved without edits, rather than runs (a quiet run is trivially "clean")
 - "Between seasons" flag for companies, so coverage is defined one way (the dashboard's definition)
 - Analytics: Vercel Web Analytics custom events need Pro, so track zero-result searches in our own table or use Umami
 - Browse rendering: per-region payload regenerated with ISR and filtered by distance on the client, vs. server-side radius queries

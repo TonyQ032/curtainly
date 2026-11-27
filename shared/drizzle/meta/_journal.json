@@ -57,6 +57,13 @@
       "when": 1794619549265,
       "tag": "0007_filter_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795738194184,
+      "tag": "0008_review_item_edited",
+      "breakpoints": true
     }
   ]
 }

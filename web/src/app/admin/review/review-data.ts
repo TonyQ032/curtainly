@@ -141,6 +141,8 @@ export async function closeReviewItem(
     reviewer: string;
     productionId?: string;
     rejectReason?: string;
+    /** Approved after the reviewer changed it ("edit then approve"). */
+    edited?: boolean;
   },
 ): Promise<void> {
   const rows = await tx

@@ -42,6 +42,7 @@ export default async function NewSourcePage({
       <SourceForm
         action={createSource}
         isNew
+        canAutoApprove={false}
         companies={all}
         defaults={{
           companyId: preset?.id ?? all[0]!.id,

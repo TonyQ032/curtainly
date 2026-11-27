@@ -11,6 +11,7 @@ import { FilterSelect, ListToolbar } from '../_components/list-toolbar';
 import { PageHeader } from '../_components/page-header';
 import { Pagination } from '../_components/pagination';
 import { SOURCE_KIND_LABELS } from './config';
+import { loadEligibility } from './eligibility';
 import { formatWhen, HealthBadge } from './health';
 
 export const metadata: Metadata = { title: 'Sources' };
@@ -34,6 +35,8 @@ type Row = {
   kind: SourceKind;
   enabled: boolean;
   autoApprove: boolean;
+  /** Eligible for auto-approve but not yet turned on. */
+  eligible: boolean;
   health: SourceHealth;
   lastRunAt: Date | null;
   lastSuccessAt: Date | null;
@@ -58,7 +61,8 @@ const columns: Column<Row>[] = [
   {
     key: 'auto',
     header: 'Auto-approve',
-    cell: (r) => (r.autoApprove ? 'Yes' : <span className="muted">No</span>),
+    cell: (r) =>
+      r.autoApprove ? 'Yes' : r.eligible ? 'Eligible' : <span className="muted">No</span>,
   },
   { key: 'health', header: 'Health', cell: (r) => <HealthBadge health={r.health} /> },
   { key: 'lastRun', header: 'Last run', cell: (r) => formatWhen(r.lastRunAt) ?? dash },
@@ -119,6 +123,11 @@ export default async function SourcesPage({
       .where(where),
   ]);
   const total = totals[0]?.total ?? 0;
+  const eligibility = await loadEligibility(rows.map((r) => r.id));
+  const tableRows: Row[] = rows.map((r) => ({
+    ...r,
+    eligible: !r.autoApprove && Boolean(eligibility.get(r.id)?.eligible),
+  }));
   const filtered = Boolean(q || kind || health || enabled !== undefined);
 
   return (
@@ -162,7 +171,7 @@ export default async function SourcesPage({
       </ListToolbar>
       <DataTable
         columns={columns}
-        rows={rows}
+        rows={tableRows}
         rowKey={(r) => r.id}
         empty={filtered ? 'No sources match these filters.' : 'No sources yet. Add the first one.'}
       />

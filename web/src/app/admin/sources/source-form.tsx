@@ -20,11 +20,14 @@ export function SourceForm({
   defaults,
   companies,
   isNew,
+  canAutoApprove,
 }: {
   action: (state: FormState, formData: FormData) => Promise<FormState>;
   defaults: SourceFormValues;
   companies: { id: string; name: string }[];
   isNew: boolean;
+  /** The source is eligible for auto-approve (or already has it), so the box can be ticked. */
+  canAutoApprove: boolean;
 }) {
   const [state, formAction] = useActionState(action, initialFormState);
   const sent = state.values;
@@ -102,15 +105,26 @@ export function SourceForm({
           </span>
         </label>
         <label className="radio">
-          <input type="checkbox" name="autoApprove" defaultChecked={checked('autoApprove')} />
+          <input
+            type="checkbox"
+            name="autoApprove"
+            defaultChecked={canAutoApprove && checked('autoApprove')}
+            disabled={!canAutoApprove}
+            aria-invalid={err('autoApprove') ? true : undefined}
+          />
           <span>
             <strong>Auto-approve</strong>{' '}
             <span className="muted">
-              · Publish updates directly (still logged to the review queue). Only after about 10
-              clean reviewed runs.
+              · Publish updates directly (still logged to the review queue).{' '}
+              {isNew
+                ? 'Available once the source has a clean review record.'
+                : canAutoApprove
+                  ? ''
+                  : 'Not eligible yet; see Auto-approval above.'}
             </span>
           </span>
         </label>
+        {err('autoApprove') && <small className="error">{err('autoApprove')}</small>}
       </fieldset>
 
       <div className="form-actions">
