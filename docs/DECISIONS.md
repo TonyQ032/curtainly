@@ -2,6 +2,32 @@
 
 Changes to, and clarifications of, [PLAN.md](PLAN.md). Newest first. PLAN.md stays the original plan; this log records what changed and why.
 
+## 2026-11-26: Ticketmaster Discovery API terms (#30)
+
+Read on 2026-11-26: the developer portal's [General Terms of Use](https://developer.ticketmaster.com/support/terms-of-use/) (last updated 2023-06-27), the [Partner API terms](https://developer.ticketmaster.com/support/terms-of-use/partner/) (same licence clauses), [Getting started](https://developer.ticketmaster.com/products-and-docs/apis/getting-started/), the [FAQ](https://developer.ticketmaster.com/support/faq/) and the [Discovery Feed](https://developer.ticketmaster.com/products-and-docs/apis/discovery-feed/) page. The branding guide these pages point to (design.ticketmaster.com) returns 401 to the public, so it couldn't be read. The terms can change without notice; re-read them before #31 ships and before #69.
+
+**What the terms say**
+
+- **Storage:** Event Content may not be cached or stored "other than for reasonable periods" needed to provide the service. No number is given, no refresh interval is required, and nothing says to delete data on termination.
+- **Removal:** anything the content owner asks us to remove must be gone within 24 hours.
+- **Attribution and links:** no logo, "powered by" or link-format clause in the terms. Raising the rate limit requires following the branding guide. Ticket purchases fall under Ticketmaster's consumer Terms of Use.
+- **Not allowed:** replicating Ticketmaster's "unique essential user experience", using Ticketmaster as an image host, hiding the app's identity, and selling, sublicensing or "deriv[ing] revenues from" the API "except as set forth below" (no exception follows on the page).
+- **Required:** a privacy policy or a footer on each page saying how visitor data is collected and used, including third-party cookies.
+- **Limits:** 5,000 calls/day. The per-second limit is stated as 5/s in Getting started and 2/s in the FAQ. Apps whose calls aren't mostly in response to user actions "may" be rate limited. Deep paging stops at size × page < 1,000.
+- **Affiliate links:** the FAQ says that once an Impact publisher ID is added to the developer account, the API and Feed return event `url`s that already carry the tracking. That's the sanctioned path for affiliate revenue, despite the "derive revenues" clause.
+- **Discovery Feed:** the Feed page calls it public, but the FAQ says it's for "approved partners" (hourly refreshes, no call limits). We don't need it at San Diego scale.
+
+**How Curtainly applies them**
+
+- **Batch use stays small.** The adapter (#31) makes a few searches a day per Region (venue or market plus Arts & Theatre classification), keeps to **2 requests/second** (the lower stated limit), and caches responses only for the run (`polite-fetch` already does this). The API key is sent with `INGEST_USER_AGENT`, never hidden.
+- **We store facts only:** title, dates and times, venue, price min/max, status and the event `url`. We never store or show Ticketmaster images or descriptions (the plan's rule already). "Reasonable period" is read as: keep what's shown while the production is listed and refresh it daily. Archived productions keep their facts (title, company, venue, dates) as history, which Ticketmaster doesn't own. The raw API payload is the part that is plainly Event Content, so **raw Ticketmaster payloads in `review_items.payload` are pruned 30 days after review** (#106).
+- **The daily refresh carries status.** `dates.status.code` maps `canceled` → `cancelled` and `postponed`/`rescheduled` → a reviewed update, so stale Ticketmaster data doesn't linger.
+- **The ticket link is the API's event `url`, unmodified.** We don't build or rewrite Ticketmaster URLs, so affiliate tracking (#69) arrives by adding the publisher ID to the developer account, with no code change. No cart, seat maps or availability, which keeps us clear of "replicating" Ticketmaster.
+- **Plain text attribution, no logo.** Ticketmaster-sourced productions say "Tickets on Ticketmaster" on the ticket button, and their price says it came from Ticketmaster and may change. No Ticketmaster logo while the branding guide is unreadable. We don't need a rate-limit increase, which is the only thing tied to the guide.
+- **Takedown within 24 hours.** The admin can take down a production and stop its source key from being re-queued (#107). The About page's takedown contact (#57) leads there.
+- **Privacy disclosure.** A privacy page plus a footer link on every public page, covering analytics and any affiliate cookies (#108). It must be live before Ticketmaster data is published.
+- **Revenue:** donations don't use the API. Before applying to the affiliate program (#69), we confirm in writing with devportalinquiry@ticketmaster.com that Impact-tracked Discovery API links are fine under the "derive revenues" clause.
+
 ## 2026-11-26: Archiving ended productions (#28)
 
 **A published production is archived from local midnight after its end date**, in the timezone of its venue's Region (`regions.timezone`). `end_date` is already a local date, so the rule is `end_date < today in the Region`; the last day of a run is never archived, even when it is already the next day in UTC. It runs as `pnpm archive`, a step after ingest in the daily workflow (11:00 UTC, about 3–4 AM in San Diego), and it runs even when ingest fails. Each Region gets its own "today", and a failing Region doesn't stop the others but fails the step.
@@ -213,4 +239,3 @@ Tracked as issues with the `decision` label:
 - "Between seasons" flag for companies, so coverage is defined one way (the dashboard's definition)
 - Analytics: Vercel Web Analytics custom events need Pro, so track zero-result searches in our own table or use Umami
 - Browse rendering: per-region payload regenerated with ISR and filtered by distance on the client, vs. server-side radius queries
-- Ticketmaster API terms on storing data, not only display (read before M2 schema work is final)
